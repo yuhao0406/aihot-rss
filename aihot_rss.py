@@ -2,7 +2,7 @@
 """
 三合一 RSS：AI热榜 + 加密货币 + 沪金沪银期货
 """
-import json, sys, os
+import json, sys, os, time
 from datetime import datetime, timedelta, timezone
 from email.utils import format_datetime
 from urllib.parse import urlencode
@@ -19,9 +19,19 @@ NOW_RFC = format_datetime(datetime.now(timezone.utc))
 def fetch_aihot(hours=24, take=30):
     since = (datetime.now(timezone.utc) - timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
     url = f"https://aihot.virxact.com/api/public/items?{urlencode({'mode':'selected', 'since':since, 'take':take})}"
-    with urlopen(Request(url, headers={"User-Agent": UA}), timeout=20) as r:
-        data = json.load(r)
-    return data.get("items", data) if isinstance(data, dict) else data
+    req = Request(url, headers={"User-Agent": UA})
+    # 重试 3 次，超时从 20s 提升到 45s
+    for attempt in range(3):
+        try:
+            with urlopen(req, timeout=45) as r:
+                data = json.load(r)
+            return data.get("items", data) if isinstance(data, dict) else data
+        except Exception as e:
+            if attempt == 2:
+                raise e
+            print(f"[aihot] 第{attempt+1}次失败，10秒后重试: {e}")
+            time.sleep(10)
+
 
 
 def fetch_crypto():
