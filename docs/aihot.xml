@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel>
+<title>综合热榜（AI热榜 + 加密货币 + 贵金属）</title>
+<link>https://github.com/yuhao0406/aihot-rss</link>
+<description>AI精选、BTC/ETH/BNB/SOL/DOGE行情、沪金沪银期货，每小时更新</description>
+<lastBuildDate>Tue, 07 Jul 2026 02:16:50 +0000</lastBuildDate>
+<item><title>Bitcoin (BTC) ¥432,898.00 +0.36%</title><link>https://www.coingecko.com/en/coins/bitcoin</link><description>Bitcoin（BTC）: ¥432,898.00 | 24h: +0.36% | 高 ¥437,597.00 / 低 ¥416,764.00</description><pubDate>Tue, 07 Jul 2026 02:16:50 +0000</pubDate><guid isPermaLink="false">Bitcoin (BTC) ¥432,898.00 +0.36%</guid></item>
+<item><title>Ethereum (ETH) ¥12,150.60 +0.19%</title><link>https://www.coingecko.com/en/coins/ethereum</link><description>Ethereum（ETH）: ¥12,150.60 | 24h: +0.19% | 高 ¥12,368.65 / 低 ¥11,768.55</description><pubDate>Tue, 07 Jul 2026 02:16:50 +0000</pubDate><guid isPermaLink="false">Ethereum (ETH) ¥12,150.60 +0.19%</guid></item>
+<item><title>BNB (BNB) ¥3,952.95 -0.90%</title><link>https://www.coingecko.com/en/coins/binancecoin</link><description>BNB（BNB）: ¥3,952.95 | 24h: -0.90% | 高 ¥4,010.84 / 低 ¥3,874.04</description><pubDate>Tue, 07 Jul 2026 02:16:50 +0000</pubDate><guid isPermaLink="false">BNB (BNB) ¥3,952.95 -0.90%</guid></item>
+<item><title>Solana (SOL) ¥555.23 +0.41%</title><link>https://www.coingecko.com/en/coins/solana</link><description>Solana（SOL）: ¥555.23 | 24h: +0.41% | 高 ¥563.98 / 低 ¥538.90</description><pubDate>Tue, 07 Jul 2026 02:16:50 +0000</pubDate><guid isPermaLink="false">Solana (SOL) ¥555.23 +0.41%</guid></item>
+<item><title>Dogecoin (DOGE) ¥0.52 -1.91%</title><link>https://www.coingecko.com/en/coins/dogecoin</link><description>Dogecoin（DOGE）: ¥0.52 | 24h: -1.91% | 高 ¥0.53 / 低 ¥0.51</description><pubDate>Tue, 07 Jul 2026 02:16:50 +0000</pubDate><guid isPermaLink="false">Dogecoin (DOGE) ¥0.52 -1.91%</guid></item>
+<item><title>沪金主连 ¥905.28 -0.66%</title><link>https://quote.eastmoney.com/qihuo/aum.html</link><description>沪金主连（aum）: ¥905.28 | 涨跌: -6.02 (-0.66%) | 成交额: ¥102,488,979,760</description><pubDate>Tue, 07 Jul 2026 02:16:50 +0000</pubDate><guid isPermaLink="false">沪金主连 ¥905.28 -0.66%</guid></item>
+<item><title>沪银主连 ¥14996.00 -1.32%</title><link>https://quote.eastmoney.com/qihuo/agm.html</link><description>沪银主连（agm）: ¥14996.00 | 涨跌: -201.00 (-1.32%) | 成交额: ¥77,933,220,855</description><pubDate>Tue, 07 Jul 2026 02:16:50 +0000</pubDate><guid isPermaLink="false">沪银主连 ¥14996.00 -1.32%</guid></item>
+</channel></rss>
