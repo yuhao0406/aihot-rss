@@ -701,6 +701,26 @@ desc = (
     return items
 
 
+        items.append(
+
+            item_xml(
+
+                "[币]"
+                +
+                coin["name"],
+
+                "https://www.coingecko.com/",
+
+                desc
+
+            )
+
+        )
+
+
+    return items
+
+
 
 
 
