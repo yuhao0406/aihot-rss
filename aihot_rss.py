@@ -184,9 +184,10 @@ def main():
     parts = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<rss version="2.0"><channel>',
-        '<title>综合热榜（AI + 币价 + 期货 + 少数派 + Elon Musk + Naval）</title>',
+        '<title>综合热榜（AI + 币价 + 期货 + 少数派 + Elon + Naval + 化工塑料）</title>',
         '<link>https://github.com/yuhao0406/aihot-rss</link>',
-        '<description>AI精选、加密行情、贵金属期货、少数派数码、Elon Musk &amp; Naval 推文，每小时更新</description>',
+        '<description>AI精选、加密行情、贵金属期货、少数派数码、Elon Musk &amp; Naval 推文、化工塑料新闻，每小时更新</description>',
+
         f'<lastBuildDate>{NOW_RFC}</lastBuildDate>',
     ]
 
@@ -230,6 +231,14 @@ def main():
         parts.extend(build_rss_items(naval_items[:10], "Naval", "Naval", "https://x.com/naval"))
     except Exception as e:
         errors.append(f"Naval: {e}")
+
+    # 7. Bing 塑料+化工新闻
+    try:
+        _, bing_items = fetch_rss("https://www.bing.com/news/search?q=塑料+化工&format=rss&cc=zh-CN")
+        parts.extend(build_rss_items(bing_items[:10], "化工塑料", "Bing化工塑料", "https://www.bing.com/news/search?q=塑料+化工"))
+    except Exception as e:
+        errors.append(f"化工塑料: {e}")
+
 
     parts.append("</channel></rss>")
 
