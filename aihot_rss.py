@@ -266,6 +266,36 @@ def main():
         parts.extend(build_rss_items(prn_items[:8], "化工", "美通社能源化工", "https://www.prnasia.com/story/industry-group/4-1.rss"))
     except Exception as e:
         errors.append(f"美通社化工: {e}")
+        
+    # 8. 美联储货币政策声明
+    try:
+        _, fed_items = fetch_rss("https://www.federalreserve.gov/feeds/press_monetary.xml")
+        parts.extend(build_rss_items(fed_items[:5], "美联储", "美联储声明", "https://www.federalreserve.gov/newsevents/pressreleases.htm"))
+    except Exception as e:
+        errors.append(f"美联储: {e}")
+
+    # 9. 巴菲特 Berkshire 13F 持仓报告
+    try:
+        _, brk_items = fetch_rss("https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001067983&type=13F-HR&dateb=&owner=exclude&count=40&output=atom")
+        parts.extend(build_rss_items(brk_items[:5], "巴菲特13F", "Berkshire持仓", "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001067983&type=13F"))
+    except Exception as e:
+        errors.append(f"巴菲特13F: {e}")
+        
+    # 10. Farside Investors — BTC/ETH/SOL ETF 资金流
+    try:
+        _, farside_items = fetch_rss("https://rss.941009.xyz/twitter/user/FarsideUK")
+        parts.extend(build_rss_items(farside_items[:8], "ETF资金", "Farside ETF", "https://x.com/FarsideUK"))
+    except Exception as e:
+        errors.append(f"Farside ETF: {e}")
+
+    # 11. Michael Saylor — Strategy 持仓/BTC 观点
+    try:
+        _, saylor_items = fetch_rss("https://rss.941009.xyz/twitter/user/saylor")
+        parts.extend(build_rss_items(saylor_items[:5], "Saylor", "Saylor BTC", "https://x.com/saylor"))
+    except Exception as e:
+        errors.append(f"Saylor: {e}")
+
+
 
 
 
