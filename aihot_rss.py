@@ -1,1389 +1,248 @@
 #!/usr/bin/env python3
 """
-AIHot RSS + Smart Money Radar
-
-功能：
-
-AI热点
-加密行情
-贵金属
-少数派
-Elon Musk
-Naval
-
-新增：
-
-机构资金雷达
-- SEC
-- MicroStrategy
-- Michael Saylor
-- BlackRock
-- Bitcoin ETF
-- Fed
-- CoinDesk
-- The Block
-
+多合一 RSS：AI热榜 + 加密货币 + 贵金属 + 少数派 + Elon Musk + Naval
 """
-
-import json
-import sys
-import os
-import time
-import re
-
+import json, sys, os, time
 from datetime import datetime, timedelta, timezone
 from email.utils import format_datetime
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 from xml.sax.saxutils import escape
-
 import xml.etree.ElementTree as ET
 
+UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+      "AppleWebKit/537.36 (KHTML, like Gecko) "
+      "Chrome/124.0.0.0 Safari/537.36 aihot-skill/0.2.0")
+OUTPUT = sys.argv[1] if len(sys.argv) > 1 else "docs/aihot.xml"
+NOW_RFC = format_datetime(datetime.now(timezone.utc))
 
+# ──────────────────── 数据采集 ────────────────────
 
-# =========================
-# 基础配置
-# =========================
-
-
-UA = (
-    "Mozilla/5.0 "
-    "(Macintosh; Intel Mac OS X 10_15_7) "
-    "AppleWebKit/537.36 "
-    "Chrome/124 Safari/537.36 "
-    "aihot-smartmoney/1.0"
-)
-
-
-OUTPUT = (
-    sys.argv[1]
-    if len(sys.argv) > 1
-    else "docs/aihot.xml"
-)
-
-
-NOW_RFC = format_datetime(
-    datetime.now(timezone.utc)
-)
-
-
-
-# =========================
-# 网络请求
-# =========================
-
-
-def http_get(url, timeout=30):
-
-    req = Request(
-        url,
-        headers={
-            "User-Agent": UA
-        }
-    )
-
-
-    with urlopen(
-        req,
-        timeout=timeout
-    ) as r:
-
-        return r.read()
-
-
-
-# =========================
-# AI热点
-# =========================
-
-
-def fetch_aihot(
-        hours=24,
-        take=30):
-
-
-    since = (
-        datetime.now(timezone.utc)
-        -
-        timedelta(hours=hours)
-    ).strftime(
-        "%Y-%m-%dT%H:%M:%SZ"
-    )
-
-
-    url = (
-        "https://aihot.virxact.com/api/public/items?"
-        +
-        urlencode(
-            {
-                "mode":"selected",
-                "since":since,
-                "take":take
-            }
-        )
-    )
-
-
-    for i in range(3):
-
+def fetch_aihot(hours=24, take=30):
+    since = (datetime.now(timezone.utc) - timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    url = f"https://aihot.virxact.com/api/public/items?{urlencode({'mode':'selected', 'since':since, 'take':take})}"
+    req = Request(url, headers={"User-Agent": UA})
+    for attempt in range(3):
         try:
-
-            data = json.loads(
-                http_get(url,45)
-            )
-
-
-            if isinstance(data,dict):
-
-                return data.get(
-                    "items",
-                    []
-                )
-
-            return data
-
-
+            with urlopen(req, timeout=45) as r:
+                data = json.load(r)
+            return data.get("items", data) if isinstance(data, dict) else data
         except Exception as e:
-
-            if i==2:
+            if attempt == 2:
                 raise e
-
-
+            print(f"[aihot] 第{attempt+1}次失败，10秒后重试: {e}")
             time.sleep(10)
 
-
-
-# =========================
-# 加密行情
-# =========================
-
-
 def fetch_crypto():
-
-
-    url = (
-        "https://api.coingecko.com/api/v3/"
-        "coins/markets?"
-        "vs_currency=cny&"
-        "ids=bitcoin,ethereum,"
-        "binancecoin,solana,dogecoin&"
-        "order=market_cap_desc&"
-        "per_page=5&page=1&"
-        "sparkline=false&"
-        "price_change_percentage=24h"
-    )
-
-
-    return json.loads(
-        http_get(url,30)
-    )
-
-
-
-# =========================
-# 贵金属
-# =========================
-
+    url = ("https://api.coingecko.com/api/v3/coins/markets"
+           "?vs_currency=cny&ids=bitcoin,ethereum,binancecoin,solana,dogecoin"
+           "&order=market_cap_desc&per_page=5&page=1&sparkline=false"
+           "&price_change_percentage=24h")
+    with urlopen(url, timeout=30) as r:
+        return json.load(r)
 
 def fetch_precious_metals():
-
-
-    url = (
-        "https://push2.eastmoney.com/api/"
-        "qt/ulist.np/get?"
-        "fltt=2&"
-        "secids=113.aum,113.agm&"
-        "fields=f2,f3,f4,f6,f12,f14,f58"
-    )
-
-
-    return json.loads(
-        http_get(url,20)
-    )
-
-
-
-# =========================
-# 通用RSS抓取
-# =========================
-
+    url = ("https://push2.eastmoney.com/api/qt/ulist.np/get"
+           "?fltt=2&secids=113.aum,113.agm&fields=f2,f3,f4,f6,f12,f14,f58")
+    with urlopen(url, timeout=20) as r:
+        return json.load(r)
 
 def fetch_rss(url):
-
-
-    raw = http_get(
-        url,
-        30
-    ).decode(
-        "utf-8",
-        errors="replace"
-    )
-
-
-    raw = re.sub(
-        r'[\x00-\x08\x0b\x0c\x0e-\x1f]',
-        '',
-        raw
-    )
-
-
+    """通用 RSS/Atom 抓取，返回 (channel_title, list_of_items)"""
+    with urlopen(url, timeout=30) as r:
+        raw = r.read().decode("utf-8", errors="replace")
+    # 清理非法 XML 字符
+    import re
+    raw = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', raw)
     root = ET.fromstring(raw)
 
+    ns = {"atom": "http://www.w3.org/2005/Atom"}
+    is_atom = root.tag == "{http://www.w3.org/2005/Atom}feed" or root.tag == "feed"
 
-    ns={
-        "atom":
-        "http://www.w3.org/2005/Atom"
-    }
+    channel_title = ""
+    items = []
 
-
-    items=[]
-
-
-    atom = (
-        root.tag.endswith("feed")
-    )
-
-
-    title=""
-
-
-    if atom:
-
-
-        title = (
-            root.findtext(
-                "atom:title",
-                "",
-                ns
-            )
-            or ""
-        )
-
-
-        entries = (
-            root.findall(
-                "atom:entry",
-                ns
-            )
-        )
-
-
-        for e in entries:
-
-
-            t = (
-                e.findtext(
-                    "atom:title",
-                    "",
-                    ns
-                )
-            )
-
-
-            link=""
-
-
-            le=e.find(
-                "atom:link",
-                ns
-            )
-
-
-            if le is not None:
-
-                link=le.get(
-                    "href",
-                    ""
-                )
-
-
-            s=(
-                e.findtext(
-                    "atom:summary",
-                    "",
-                    ns
-                )
-            )
-
-
-            u=(
-                e.findtext(
-                    "atom:updated",
-                    "",
-                    ns
-                )
-            )
-
-
-            items.append(
-                {
-                    "title":t,
-                    "link":link,
-                    "summary":s,
-                    "updated":u
-                }
-            )
-
-
+    if is_atom:
+        channel_title = root.findtext("atom:title", default="", namespaces=ns) or root.findtext("title", default="")
+        for entry in root.findall("atom:entry", ns) or root.findall("entry"):
+            title = entry.findtext("atom:title", default="", namespaces=ns) or entry.findtext("title", default="(无标题)")
+            link_elem = entry.find("atom:link", ns) or entry.find("link")
+            link = ""
+            if link_elem is not None:
+                link = link_elem.get("href", link_elem.text or "")
+            summary = entry.findtext("atom:summary", default="", namespaces=ns) or entry.findtext("summary", default="")
+            updated = entry.findtext("atom:updated", default="", namespaces=ns) or entry.findtext("updated", default="")
+            items.append({"title": title.strip(), "link": link.strip(), "summary": summary.strip(), "updated": updated.strip()})
     else:
-
-
-        title=root.findtext(
-            "channel/title",
-            ""
-        )
-
-
-        for e in root.findall(
-            "channel/item"
-        ):
-
-
-            items.append(
-                {
-                    "title":
-                    e.findtext(
-                        "title",
-                        ""
-                    ),
-
-                    "link":
-                    e.findtext(
-                        "link",
-                        ""
-                    ),
-
-                    "summary":
-                    e.findtext(
-                        "description",
-                        ""
-                    ),
-
-                    "updated":
-                    e.findtext(
-                        "pubDate",
-                        ""
-                    )
-                }
-            )
-
-
-    return title,items
-
-
-
-# ===== Part 1结束 =====
-# =====================================================
-# Smart Money 资金雷达模块
-# =====================================================
-
-
-SMART_KEYWORDS = {
-
-
-    # ===== 机构 =====
-
-    "MicroStrategy":10,
-    "Michael Saylor":10,
-    "MSTR":10,
-
-    "BlackRock":9,
-    "iShares":9,
-    "IBIT":10,
-
-    "Berkshire Hathaway":8,
-    "Warren Buffett":8,
-    "Buffett":8,
-
-
-    # ===== ETF =====
-
-    "Bitcoin ETF":10,
-    "BTC ETF":10,
-    "ETF inflow":9,
-    "ETF outflow":-9,
-
-
-    # ===== BTC资金 =====
-
-    "Bitcoin":5,
-    "BTC":5,
-
-    "whale":8,
-    "accumulation":8,
-
-    "exchange inflow":-8,
-    "exchange outflow":8,
-
-
-    # ===== 宏观 =====
-
-    "Federal Reserve":10,
-    "FOMC":10,
-    "Jerome Powell":9,
-
-    "interest rate":7,
-    "liquidity":8,
-
-    "quantitative easing":10,
-    "QT":-8,
-
-
-    # ===== SEC =====
-
-    "13F":8,
-    "8-K":8,
-    "SEC filing":8,
-
-}
-
-
-
-SMART_SOURCES = [
-
-
-    {
-        "name":"SEC",
-        "label":"机构文件",
-
-        "url":
-        "https://www.sec.gov/cgi-bin/"
-        "browse-edgar?"
-        "action=getcurrent&"
-        "output=atom"
-    },
-
-
-    {
-        "name":"CoinDesk",
-        "label":"机构加密",
-
-        "url":
-        "https://www.coindesk.com/"
-        "arc/outboundfeeds/rss/"
-    },
-
-
-    {
-        "name":"TheBlock",
-        "label":"机构加密",
-
-        "url":
-        "https://www.theblock.co/rss.xml"
-    },
-
-
-    {
-        "name":"Fed",
-        "label":"宏观流动性",
-
-        "url":
-        "https://www.federalreserve.gov/"
-        "feeds/press_all.xml"
-    },
-
-]
-
-
-
-def smart_score(text):
-
-
-    score=0
-
-
-    lower=text.lower()
-
-
-    for key,value in SMART_KEYWORDS.items():
-
-        if key.lower() in lower:
-
-            score += value
-
-
-    return score
-
-
-
-
-def fetch_smart_money():
-
-
-    results=[]
-
-
-    for source in SMART_SOURCES:
-
-
-        try:
-
-
-            _,items = fetch_rss(
-                source["url"]
-            )
-
-
-            for item in items[:20]:
-
-
-                text = (
-                    item["title"]
-                    +
-                    item["summary"]
-                )
-
-
-                score = smart_score(
-                    text
-                )
-
-
-                # 没有资金价值过滤
-
-                if score <= 0:
-
-                    continue
-
-
-
-                results.append(
-                    {
-
-                    "source":
-                    source["label"],
-
-
-                    "title":
-                    item["title"],
-
-
-                    "link":
-                    item["link"],
-
-
-                    "summary":
-                    item["summary"],
-
-
-                    "updated":
-                    item["updated"],
-
-
-                    "score":
-                    score
-
-                    }
-                )
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[SmartMoney错误]",
-                source["name"],
-                e
-            )
-
-
-
-    # 高分优先
-
-    results.sort(
-        key=lambda x:x["score"],
-        reverse=True
-    )
-
-
-    return results
-
-
-
-
-# =====================================================
-# RSS XML生成
-# =====================================================
-
-
-
-def item_xml(
-        title,
-        link,
-        description,
-        pub_date=None):
-
-
-    pub = (
-        pub_date
-        or
-        NOW_RFC
-    )
-
-
-    return (
-
-        "<item>"
-
-        f"<title>{escape(title)}</title>"
-
-        f"<link>{escape(link)}</link>"
-
-        f"<description>{escape(description)}</description>"
-
-        f"<pubDate>{pub}</pubDate>"
-
-        f"<guid isPermaLink=\"false\">"
-        f"{escape(title)}"
-        "</guid>"
-
-        "</item>"
-
-    )
-
-
-
-
-
-def format_pct(v):
-
-
-    sign="+" if v>=0 else ""
-
-
-    return (
-        f"{sign}{v:.2f}%"
-    )
-
-
-
-
+        channel_title = root.findtext("channel/title", default="")
+        for item in root.findall("channel/item"):
+            title = item.findtext("title", default="(无标题)")
+            link = item.findtext("link", default="")
+            desc = item.findtext("description", default="")
+            pub = item.findtext("pubDate", default="")
+            items.append({"title": title.strip(), "link": link.strip(), "summary": desc.strip(), "updated": pub.strip()})
+
+    return channel_title, items
+
+# ──────────────────── RSS 构建 ────────────────────
+
+def item_xml(title, link, description, pub_date=None):
+    pub = pub_date or NOW_RFC
+    return (f"<item>"
+            f"<title>{escape(title)}</title>"
+            f"<link>{escape(link)}</link>"
+            f"<description>{escape(description)}</description>"
+            f"<pubDate>{pub}</pubDate>"
+            f'<guid isPermaLink="false">{escape(title)}</guid>'
+            f"</item>")
+
+def format_pct(val):
+    sign = "+" if val >= 0 else ""
+    return f"{sign}{val:.2f}%"
 
 def build_crypto_items(data):
     items = []
-
     for coin in data:
-        pct = coin.get("price_change_percentage_24h", 0)
-        price = coin.get("current_price", 0)
-        name = coin.get("name", "")
-        symbol = coin.get("symbol", "").upper()
-
-        desc = (
-            name
-            + " ("
-            + symbol
-            + ") 价格:"
-            + str(price)
-            + " 24h:"
-            + format_pct(pct)
-        )
-
-        items.append(
-            item_xml(
-                "[币] " + name,
-                "https://www.coingecko.com/",
-                desc
-            )
-        )
-
+        desc = (f"{coin['name']}（{coin['symbol'].upper()}）: "
+                f"¥{coin['current_price']:,.2f} | "
+                f"24h: {format_pct(coin['price_change_percentage_24h'])} | "
+                f"高 ¥{coin.get('high_24h', 0):,.2f} / 低 ¥{coin.get('low_24h', 0):,.2f}")
+        items.append(item_xml(
+            title=f"[币] {coin['name']} ({coin['symbol'].upper()}) ¥{coin['current_price']:,.2f} {format_pct(coin['price_change_percentage_24h'])}",
+            link=f"https://www.coingecko.com/en/coins/{coin['id']}",
+            description=desc,
+        ))
     return items
-
-        items.append(
-
-            item_xml(
-
-                "[币]"
-                +
-                coin["name"],
-
-                "https://www.coingecko.com/",
-
-                desc
-
-            )
-
-        )
-
-
-    return items
-
-
-
-
-
-def build_smart_money_items(data):
-
-
-    items=[]
-
-
-    for item in data:
-
-
-        desc=(
-
-            "资金来源:"
-            +
-            item["source"]
-
-            +
-
-            "\n\n评分:"
-            +
-            str(item["score"])
-
-            +
-
-            "\n\n"
-
-            +
-
-            item["summary"]
-
-        )
-
-
-        title=(
-
-            "[资金+"
-
-            +
-            str(item["score"])
-
-            +
-
-            "] "
-
-            +
-
-            item["title"]
-
-        )
-
-
-        items.append(
-
-            item_xml(
-
-                title,
-
-                item["link"],
-
-                desc,
-
-                item["updated"]
-
-            )
-
-        )
-
-
-    return items
-
-
-
-# ===== Part 2结束 =====
-# =====================================================
-# 其它RSS内容构建
-# =====================================================
-
-
-def build_aihot_items(data):
-
-    items=[]
-
-
-    for it in data:
-
-
-        title = (
-            it.get("title")
-            or
-            it.get("name")
-            or
-            "(无标题)"
-        )
-
-
-        link = (
-            it.get("url")
-            or
-            it.get("link")
-            or
-            "https://aihot.virxact.com/"
-        )
-
-
-        summary = (
-            it.get("summary")
-            or
-            it.get("description")
-            or
-            title
-        )
-
-
-        pub = (
-            it.get("published_at")
-            or
-            it.get("created_at")
-        )
-
-
-        try:
-
-            if pub:
-
-                dt=datetime.fromisoformat(
-                    pub.replace(
-                        "Z",
-                        "+00:00"
-                    )
-                )
-
-                rfc=format_datetime(dt)
-
-            else:
-
-                rfc=NOW_RFC
-
-
-        except:
-
-            rfc=NOW_RFC
-
-
-
-        items.append(
-
-            item_xml(
-
-                "[AI] "
-                +
-                title,
-
-                link,
-
-                summary,
-
-                rfc
-
-            )
-
-        )
-
-
-    return items
-
-
-
-
-
-def build_rss_items(
-        raw_items,
-        label,
-        default_link):
-
-
-    items=[]
-
-
-    for item in raw_items[:10]:
-
-
-        title=item.get(
-            "title",
-            "(无标题)"
-        )
-
-
-        summary=item.get(
-            "summary",
-            ""
-        )
-
-
-        summary=re.sub(
-            "<[^>]+>",
-            "",
-            summary
-        )
-
-
-        summary=summary[:300]
-
-
-        link=item.get(
-            "link",
-            default_link
-        )
-
-
-        pub=item.get(
-            "updated",
-            NOW_RFC
-        )
-
-
-
-        items.append(
-
-            item_xml(
-
-                "["+label+"] "
-                +
-                title,
-
-                link,
-
-                summary,
-
-                pub
-
-            )
-
-        )
-
-
-    return items
-
-
-
 
 def build_metal_items(data):
-
-
-    items=[]
-
-
-    try:
-
-
-        metals=data.get(
-            "data",
-            {}
-        ).get(
-            "diff",
-            []
-        )
-
-
-        for m in metals:
-
-
-            name=m.get(
-                "f14",
-                ""
-            )
-
-
-            price=m.get(
-                "f2",
-                0
-            )
-
-
-            pct=m.get(
-                "f3",
-                0
-            )
-
-
-            items.append(
-
-                item_xml(
-
-                    "[贵金属] "
-                    +
-                    name,
-
-                    "https://quote.eastmoney.com/",
-
-                    f"{name} "
-                    f"价格:{price} "
-                    f"涨跌:{pct}%"
-
-                )
-
-            )
-
-
-    except Exception:
-
-        pass
-
-
+    items = []
+    for m in data.get("data", {}).get("diff", []):
+        name = m.get("f14", "")
+        code = m.get("f12", "")
+        price = m.get("f2", 0)
+        pct = m.get("f3", 0)
+        val = m.get("f4", 0)
+        vol = m.get("f6", 0)
+        desc = (f"{name}（{code}）: ¥{price:.2f} | "
+                f"涨跌: {val:.2f} ({format_pct(pct)}) | "
+                f"成交额: ¥{vol:,.0f}")
+        items.append(item_xml(
+            title=f"[期货] {name} ¥{price:.2f} {format_pct(pct)}",
+            link=f"https://quote.eastmoney.com/qihuo/{code}.html",
+            description=desc,
+        ))
     return items
 
+def build_aihot_items(data):
+    items = []
+    for it in data:
+        t = it.get("title") or it.get("name") or "(无标题)"
+        u = it.get("url") or it.get("link") or "https://aihot.virxact.com/"
+        s = it.get("summary") or it.get("description") or it.get("excerpt") or t
+        pub = it.get("published_at") or it.get("created_at")
+        try:
+            dt = datetime.fromisoformat(pub.replace("Z","+00:00")) if pub else None
+            rfc = format_datetime(dt) if dt else NOW_RFC
+        except:
+            rfc = NOW_RFC
+        items.append(item_xml(f"[AI] {t}", u, s, pub_date=rfc))
+    return items
 
+def build_rss_items(raw_items, source_label, source_name, default_link):
+    """将通用 RSS item 转为标准 XML 条目，推文摘要截短"""
+    items = []
+    for ri in raw_items:
+        t = ri["title"]
+        # Twitter 推文通常内容很长，摘要只取前200字符
+        s = ri["summary"]
+        # 去掉 HTML 标签
+        import re
+        s = re.sub(r'<[^>]+>', '', s)
+        s = s[:300].strip()
+        if len(s) >= 300:
+            s += "..."
 
+        u = ri["link"] or default_link
+        pub = ri["updated"]
+        try:
+            dt = None
+            for fmt in ["%a, %d %b %Y %H:%M:%S %z", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%SZ"]:
+                try:
+                    dt = datetime.strptime(pub, fmt) if pub else None
+                    break
+                except:
+                    continue
+            rfc = format_datetime(dt) if dt else NOW_RFC
+        except:
+            rfc = NOW_RFC
+        items.append(item_xml(f"[{source_label}] {t}", u, s, pub_date=rfc))
+    return items
 
-
-# =====================================================
-# 主程序
-# =====================================================
-
+# ──────────────────── 主流程 ────────────────────
 
 def main():
-
-
-    parts=[
-
+    parts = [
         '<?xml version="1.0" encoding="UTF-8"?>',
-
-        '<rss version="2.0">',
-
-        '<channel>',
-
-
-        '<title>'
-        'AIHot Smart Money资金雷达'
-        '</title>',
-
-
-        '<link>'
-        'https://github.com/yuhao0406/aihot-rss'
-        '</link>',
-
-
-        '<description>'
-        'AI热点 + 加密行情 + '
-        '机构资金流 + 美联储 + ETF'
-        '</description>',
-
-
-        f'<lastBuildDate>{NOW_RFC}</lastBuildDate>'
-
+        '<rss version="2.0"><channel>',
+        '<title>综合热榜（AI + 币价 + 期货 + 少数派 + Elon Musk + Naval）</title>',
+        '<link>https://github.com/yuhao0406/aihot-rss</link>',
+        '<description>AI精选、加密行情、贵金属期货、少数派数码、Elon Musk &amp; Naval 推文，每小时更新</description>',
+        f'<lastBuildDate>{NOW_RFC}</lastBuildDate>',
     ]
 
+    errors = []
 
-
-    errors=[]
-
-
-
-    # ------------------
-    # AI热点
-    # ------------------
-
+    # 1. AI热榜
     try:
-
-
-        ai = fetch_aihot()
-
-
-        parts.extend(
-
-            build_aihot_items(
-                ai
-            )
-
-        )
-
-
+        parts.extend(build_aihot_items(fetch_aihot()))
     except Exception as e:
+        errors.append(f"AI热榜: {e}")
 
-
-        errors.append(
-            "AI热点:"+str(e)
-        )
-
-
-
-
-    # ------------------
-    # 加密行情
-    # ------------------
-
+    # 2. 加密货币
     try:
-
-
-        crypto=fetch_crypto()
-
-
-        parts.extend(
-
-            build_crypto_items(
-                crypto
-            )
-
-        )
-
-
+        parts.extend(build_crypto_items(fetch_crypto()))
     except Exception as e:
+        errors.append(f"加密货币: {e}")
 
-
-        errors.append(
-            "币价:"+str(e)
-        )
-
-
-
-
-
-    # ------------------
-    # 贵金属
-    # ------------------
-
+    # 3. 贵金属期货
     try:
-
-
-        metals=fetch_precious_metals()
-
-
-        parts.extend(
-
-            build_metal_items(
-                metals
-            )
-
-        )
-
-
+        parts.extend(build_metal_items(fetch_precious_metals()))
     except Exception as e:
+        errors.append(f"贵金属: {e}")
 
-
-        errors.append(
-            "贵金属:"+str(e)
-        )
-
-
-
-
-
-
-    # ------------------
-    # 少数派
-    # ------------------
-
+    # 4. 少数派
     try:
-
-
-        _,sspai=fetch_rss(
-
-            "https://sspai.com/feed"
-
-        )
-
-
-        parts.extend(
-
-            build_rss_items(
-
-                sspai,
-
-                "少数派",
-
-                "https://sspai.com"
-
-            )
-
-        )
-
-
+        _, sspai_items = fetch_rss("https://sspai.com/feed")
+        parts.extend(build_rss_items(sspai_items[:10], "少数派", "少数派", "https://sspai.com"))
     except Exception as e:
+        errors.append(f"少数派: {e}")
 
-
-        errors.append(
-            "少数派:"+str(e)
-        )
-
-
-
-
-
-    # ------------------
-    # Elon Musk
-    # ------------------
-
+    # 5. Elon Musk 推文
     try:
-
-
-        _,elon=fetch_rss(
-
-            "https://rss.941009.xyz/twitter/user/elonmusk"
-
-        )
-
-
-        parts.extend(
-
-            build_rss_items(
-
-                elon,
-
-                "Elon Musk",
-
-                "https://x.com/elonmusk"
-
-            )
-
-        )
-
-
+        _, elon_items = fetch_rss("https://rss.941009.xyz/twitter/user/elonmusk")
+        parts.extend(build_rss_items(elon_items[:10], "Elon Musk", "Elon Musk", "https://x.com/elonmusk"))
     except Exception as e:
+        errors.append(f"Elon Musk: {e}")
 
-
-        errors.append(
-            "Elon:"+str(e)
-        )
-
-
-
-
-
-    # ------------------
-    # Naval
-    # ------------------
-
+    # 6. Naval 推文
     try:
-
-
-        _,naval=fetch_rss(
-
-            "https://rss.941009.xyz/twitter/user/naval"
-
-        )
-
-
-        parts.extend(
-
-            build_rss_items(
-
-                naval,
-
-                "Naval",
-
-                "https://x.com/naval"
-
-            )
-
-        )
-
-
+        _, naval_items = fetch_rss("https://rss.941009.xyz/twitter/user/naval")
+        parts.extend(build_rss_items(naval_items[:10], "Naval", "Naval", "https://x.com/naval"))
     except Exception as e:
+        errors.append(f"Naval: {e}")
 
+    parts.append("</channel></rss>")
 
-        errors.append(
-            "Naval:"+str(e)
-        )
-
-
-
-
-
-
-    # =================================================
-    # Smart Money资金雷达
-    # =================================================
-
-
-    try:
-
-
-        smart=fetch_smart_money()
-
-
-
-        parts.extend(
-
-            build_smart_money_items(
-
-                smart[:50]
-
-            )
-
-        )
-
-
-
-    except Exception as e:
-
-
-        errors.append(
-
-            "SmartMoney:"
-            +
-            str(e)
-
-        )
-
-
-
-
-
-
-    parts.append(
-
-        "</channel></rss>"
-
-    )
-
-
-
-    os.makedirs(
-
-        os.path.dirname(
-            OUTPUT
-        )
-        or
-        ".",
-
-        exist_ok=True
-
-    )
-
-
-
-    with open(
-
-        OUTPUT,
-
-        "w",
-
-        encoding="utf-8"
-
-    ) as f:
-
-
-        f.write(
-
-            "\n".join(parts)
-
-        )
-
-
-
-
-
-    print(
-        "DONE:",
-        OUTPUT
-    )
-
-
+    os.makedirs(os.path.dirname(OUTPUT) or ".", exist_ok=True)
+    with open(OUTPUT, "w", encoding="utf-8") as f:
+        f.write("\n".join(parts))
 
     if errors:
-
-
-        print(
-            "\n错误:"
-        )
-
-
+        print("!!! 以下数据源获取失败，其余正常:")
         for e in errors:
-
-            print(
-                "-",
-                e
-            )
+            print("  -", e)
+    print(f"DONE {OUTPUT}")
 
 
-
-
-
-if __name__=="__main__":
-
-
+if __name__ == "__main__":
     main()
