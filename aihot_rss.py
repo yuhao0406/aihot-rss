@@ -7,7 +7,16 @@ from datetime import datetime, timedelta, timezone
 from email.utils import format_datetime
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
-from xml.sax.saxutils import escape
+def escape(text):
+    """安全的 XML 转义，支持中文"""
+    text = str(text)
+    text = text.replace("&", "&amp;")
+    text = text.replace("<", "&lt;")
+    text = text.replace(">", "&gt;")
+    text = text.replace('"', "&quot;")
+    text = text.replace("'", "&apos;")
+    return text
+
 import xml.etree.ElementTree as ET
 
 UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
