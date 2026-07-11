@@ -164,12 +164,15 @@ def build_rss_items(raw_items, source_label, source_name, default_link):
     """将通用 RSS item 转为标准 XML 条目，推文摘要截短"""
     items = []
     for ri in raw_items:
-        t = ri["title"]
+        t = ri["title"].encode('utf-8', errors='replace').decode('utf-8')
+
         # Twitter 推文通常内容很长，摘要只取前200字符
         s = ri["summary"]
         # 去掉 HTML 标签
         import re
         s = re.sub(r'<[^>]+>', '', s)
+        s = s.encode('utf-8', errors='replace').decode('utf-8')  # 新增
+
         s = s[:300].strip()
         if len(s) >= 300:
             s += "..."
