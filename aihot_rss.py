@@ -54,8 +54,19 @@ def fetch_rss(url):
     if "bing.com" in url:
         headers["Referer"] = "https://www.bing.com/news/"
     req = Request(url, headers=headers)
-    with urlopen(req, timeout=30) as r:
-        raw = r.read().decode("utf-8", errors="replace")
+        with urlopen(req, timeout=30) as r:
+        raw_bytes = r.read()
+        # 自动检测编码
+        import codecs
+        # Bing RSS 有时会带 BOM 或非标准编码
+        if raw_bytes[:3] == b'\xef\xbb\xbf':
+            raw = raw_bytes[3:].decode('utf-8', errors='replace')
+        else:
+            try:
+                raw = raw_bytes.decode('utf-8', errors='replace')
+            except:
+                raw = raw_bytes.decode('latin-1', errors='replace')
+
     import re
     raw = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', raw)
     root = ET.fromstring(raw)
@@ -238,11 +249,11 @@ def main():
 
     # 7. Bing 化工塑料系列
     bing_queries = [
-        ("化工+塑料", "化工塑料", "https://www.bing.com/news/search?q=塑料+化工&format=rss&cc=zh-CN"),
-        ("PP+聚丙烯", "PP聚丙烯", "https://www.bing.com/news/search?q=pp+聚丙烯&format=rss&cc=zh-CN"),
-        ("尼龙+PA", "尼龙PA", "https://www.bing.com/news/search?q=尼龙+PA&format=rss&cc=zh-CN"),
-        ("塑料价格", "塑料价格", "https://www.bing.com/news/search?q=塑料价格&format=rss&cc=zh-CN"),
-        ("塑料原料市场", "塑料原料", "https://www.bing.com/news/search?q=塑料原料市场&format=rss&cc=zh-CN"),
+        ("化工+塑料", "化工塑料", "https://www.bing.com/news/search?q=塑料+化工&format=rss&cc=US"),
+        ("PP+聚丙烯", "PP聚丙烯", "https://www.bing.com/news/search?q=pp+聚丙烯&format=rss&cc=US"),
+        ("尼龙+PA", "尼龙PA", "https://www.bing.com/news/search?q=尼龙+PA&format=rss&cc=US"),
+        ("塑料价格", "塑料价格", "https://www.bing.com/news/search?q=塑料价格&format=rss&cc=US"),
+        ("塑料原料市场", "塑料原料", "https://www.bing.com/news/search?q=塑料原料市场&format=rss&cc=US"),
     ]
     for label, tag, q_url in bing_queries:
         try:
