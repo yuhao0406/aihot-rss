@@ -48,10 +48,14 @@ def fetch_precious_metals():
         return json.load(r)
 
 def fetch_rss(url):
-    """通用 RSS/Atom 抓取，返回 (channel_title, list_of_items)"""
-    with urlopen(url, timeout=30) as r:
+    """通用 RSS/Atom 抓取"""
+    headers = {"User-Agent": UA}
+    # Bing 需要 Referer 否则重定向到主页
+    if "bing.com" in url:
+        headers["Referer"] = "https://www.bing.com/news/"
+    req = Request(url, headers=headers)
+    with urlopen(req, timeout=30) as r:
         raw = r.read().decode("utf-8", errors="replace")
-    # 清理非法 XML 字符
     import re
     raw = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', raw)
     root = ET.fromstring(raw)
@@ -232,12 +236,21 @@ def main():
     except Exception as e:
         errors.append(f"Naval: {e}")
 
-    # 7. Bing 塑料+化工新闻
-    try:
-        _, bing_items = fetch_rss("https://www.bing.com/news/search?q=塑料+化工&format=rss&cc=zh-CN")
-        parts.extend(build_rss_items(bing_items[:10], "化工塑料", "Bing化工塑料", "https://www.bing.com/news/search?q=塑料+化工"))
-    except Exception as e:
-        errors.append(f"化工塑料: {e}")
+    # 7. Bing 化工塑料系列
+    bing_queries = [
+        ("化工+塑料", "化工塑料", "https://www.bing.com/news/search?q=塑料+化工&format=rss&cc=zh-CN"),
+        ("PP+聚丙烯", "PP聚丙烯", "https://www.bing.com/news/search?q=pp+聚丙烯&format=rss&cc=zh-CN"),
+        ("尼龙+PA", "尼龙PA", "https://www.bing.com/news/search?q=尼龙+PA&format=rss&cc=zh-CN"),
+        ("塑料价格", "塑料价格", "https://www.bing.com/news/search?q=塑料价格&format=rss&cc=zh-CN"),
+        ("塑料原料市场", "塑料原料", "https://www.bing.com/news/search?q=塑料原料市场&format=rss&cc=zh-CN"),
+    ]
+    for label, tag, q_url in bing_queries:
+        try:
+            _, bing_items = fetch_rss(q_url)
+            parts.extend(build_rss_items(bing_items[:5], tag, label, q_url))
+        except Exception as e:
+            errors.append(f"Bing-{label}: {e}")
+
 
 
     parts.append("</channel></rss>")
