@@ -260,20 +260,13 @@ def main():
     except Exception as e:
         errors.append(f"Naval: {e}")
 
-        # 7. Google News 化工塑料
-    gn_queries = [
-        ("塑料+化工", "化工塑料", "https://news.google.com/rss/search?q=塑料+化工&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"),
-        ("PP+聚丙烯", "PP聚丙烯", "https://news.google.com/rss/search?q=pp+聚丙烯&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"),
-        ("尼龙+PA", "尼龙PA", "https://news.google.com/rss/search?q=尼龙+PA&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"),
-        ("塑料价格", "塑料价格", "https://news.google.com/rss/search?q=塑料价格&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"),
-        ("塑料原料市场", "塑料原料", "https://news.google.com/rss/search?q=塑料原料市场&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"),
-    ]
-    for label, tag, q_url in gn_queries:
-        try:
-            _, gn_items = fetch_rss(q_url)
-            parts.extend(build_rss_items(gn_items[:5], tag, label, q_url))
-        except Exception as e:
-            errors.append(f"GoogNews-{label}: {e}")
+    # 7. 美通社能源化工环保
+    try:
+        _, prn_items = fetch_rss("https://www.prnasia.com/story/industry-group/4-1.rss")
+        parts.extend(build_rss_items(prn_items[:8], "化工", "美通社能源化工", "https://www.prnasia.com/story/industry-group/4-1.rss"))
+    except Exception as e:
+        errors.append(f"美通社化工: {e}")
+
 
 
 
