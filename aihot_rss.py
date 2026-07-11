@@ -701,18 +701,11 @@ def build_crypto_items(data):
 
 
         items.append(
-
             item_xml(
-
-                "[币] "
-                + name,
-
+                "[币] " + name,
                 "https://www.coingecko.com/",
-
                 desc
-
             )
-
         )
 
 
