@@ -50,23 +50,19 @@ def fetch_precious_metals():
 def fetch_rss(url):
     """通用 RSS/Atom 抓取"""
     headers = {"User-Agent": UA}
-    # Bing 需要 Referer 否则重定向到主页
     if "bing.com" in url:
         headers["Referer"] = "https://www.bing.com/news/"
     req = Request(url, headers=headers)
-        with urlopen(req, timeout=30) as r:
+    with urlopen(req, timeout=30) as r:
         raw_bytes = r.read()
-        # 自动检测编码
-        import codecs
-        # Bing RSS 有时会带 BOM 或非标准编码
-        if raw_bytes[:3] == b'\xef\xbb\xbf':
-            raw = raw_bytes[3:].decode('utf-8', errors='replace')
-        else:
-            try:
-                raw = raw_bytes.decode('utf-8', errors='replace')
-            except:
-                raw = raw_bytes.decode('latin-1', errors='replace')
-
+    # 自动检测编码
+    if raw_bytes[:3] == b'\xef\xbb\xbf':
+        raw = raw_bytes[3:].decode('utf-8', errors='replace')
+    else:
+        try:
+            raw = raw_bytes.decode('utf-8', errors='replace')
+        except:
+            raw = raw_bytes.decode('latin-1', errors='replace')
     import re
     raw = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', raw)
     root = ET.fromstring(raw)
@@ -98,6 +94,7 @@ def fetch_rss(url):
             items.append({"title": title.strip(), "link": link.strip(), "summary": desc.strip(), "updated": pub.strip()})
 
     return channel_title, items
+
 
 # ──────────────────── RSS 构建 ────────────────────
 
