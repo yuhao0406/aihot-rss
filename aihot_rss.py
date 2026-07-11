@@ -160,8 +160,10 @@ def build_metal_items(data):
 def fetch_dexscreener(keyword="BTC"):
     """DexScreener DEX 交易数据"""
     url = f"https://api.dexscreener.com/latest/dex/search?q={keyword}"
-    with urlopen(url, timeout=20) as r:
+    req = Request(url, headers={"User-Agent": UA})
+    with urlopen(req, timeout=20) as r:
         return json.load(r)
+
 
 def build_dex_items(data, keyword="BTC"):
     items = []
