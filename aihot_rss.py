@@ -55,7 +55,7 @@ def fetch_rss(url):
     req = Request(url, headers=headers)
     with urlopen(req, timeout=30) as r:
         raw_bytes = r.read()
-    # 自动检测编码
+    # 解码
     if raw_bytes[:3] == b'\xef\xbb\xbf':
         raw = raw_bytes[3:].decode('utf-8', errors='replace')
     else:
@@ -65,7 +65,9 @@ def fetch_rss(url):
             raw = raw_bytes.decode('latin-1', errors='replace')
     import re
     raw = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', raw)
-    root = ET.fromstring(raw)
+
+    # 关键：用 bytes 喂给 XML 解析器，避免 ASCII 编码错误
+    root = ET.fromstring(raw.encode('utf-8'))
 
     ns = {"atom": "http://www.w3.org/2005/Atom"}
     is_atom = root.tag == "{http://www.w3.org/2005/Atom}feed" or root.tag == "feed"
