@@ -304,11 +304,11 @@ def main():
         errors.append(f"美联储: {e}")
 
     # 9. 巴菲特 Berkshire 13F 持仓报告
-    try:
-        _, brk_items = fetch_rss("https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001067983&type=13F-HR&dateb=&owner=exclude&count=40&output=atom")
-        parts.extend(build_rss_items(brk_items[:5], "巴菲特13F", "Berkshire持仓", "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001067983&type=13F"))
-    except Exception as e:
-        errors.append(f"巴菲特13F: {e}")
+    #try:
+       # _, brk_items = fetch_rss("https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001067983&type=13F-HR&dateb=&owner=exclude&count=40&output=atom")
+        #parts.extend(build_rss_items(brk_items[:5], "巴菲特13F", "Berkshire持仓", "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001067983&type=13F"))
+    #except Exception as e:
+        #errors.append(f"巴菲特13F: {e}")
         
     # 10. Farside Investors — BTC/ETH/SOL ETF 资金流
     try:
