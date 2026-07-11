@@ -157,6 +157,33 @@ def build_metal_items(data):
             description=desc,
         ))
     return items
+def fetch_dexscreener(keyword="BTC"):
+    """DexScreener DEX 交易数据"""
+    url = f"https://api.dexscreener.com/latest/dex/search?q={keyword}"
+    with urlopen(url, timeout=20) as r:
+        return json.load(r)
+
+def build_dex_items(data, keyword="BTC"):
+    items = []
+    for pair in data.get("pairs", [])[:5]:
+        base = pair.get("baseToken", {}).get("symbol", "?")
+        quote = pair.get("quoteToken", {}).get("symbol", "?")
+        price = pair.get("priceUsd", 0)
+        chain = pair.get("chainId", "?")
+        dex = pair.get("dexId", "?")
+        vol24 = pair.get("volume", {}).get("h24", 0)
+        buys24 = pair.get("txns", {}).get("h24", {}).get("buys", 0)
+        sells24 = pair.get("txns", {}).get("h24", {}).get("sells", 0)
+        liq = pair.get("liquidity", {}).get("usd", 0)
+
+        desc = (f"链: {chain} | DEX: {dex} | 价格: ${price:,.2f} | "
+                f"24h量: ${vol24:,.0f} | 买{buy24}/卖{sell24} | 流动性: ${liq:,.0f}")
+        items.append(item_xml(
+            title=f"[DEX] {base}/{quote} ${price:,.2f} | {chain}/{dex}",
+            link=pair.get("url", "https://dexscreener.com"),
+            description=desc,
+        ))
+    return items
 
 def build_aihot_items(data):
     items = []
@@ -294,6 +321,29 @@ def main():
         parts.extend(build_rss_items(saylor_items[:5], "Saylor", "Saylor BTC", "https://x.com/saylor"))
     except Exception as e:
         errors.append(f"Saylor: {e}")
+
+    # 12. Whale Alert — 巨鲸转账
+    try:
+        _, whale_items = fetch_rss("https://rss.941009.xyz/twitter/user/whale_alert")
+        parts.extend(build_rss_items(whale_items[:8], "巨鲸", "Whale Alert", "https://x.com/whale_alert"))
+    except Exception as e:
+        errors.append(f"Whale Alert: {e}")
+
+    # 13. Nansen AI — Smart Money 公告
+    try:
+        _, nansen_items = fetch_rss("https://rss.941009.xyz/twitter/user/nansen_ai")
+        parts.extend(build_rss_items(nansen_items[:5], "SmartMoney", "Nansen", "https://x.com/nansen_ai"))
+    except Exception as e:
+        errors.append(f"Nansen: {e}")
+
+    # 14. DexScreener DEX 数据
+    try:
+        dex_data = fetch_dexscreener("BTC")
+        parts.extend(build_dex_items(dex_data, "BTC"))
+    except Exception as e:
+        errors.append(f"DexScreener: {e}")
+
+
 
 
 
