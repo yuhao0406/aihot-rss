@@ -170,13 +170,13 @@ def build_dex_items(data, keyword="BTC"):
     for pair in data.get("pairs", [])[:5]:
         base = pair.get("baseToken", {}).get("symbol", "?")
         quote = pair.get("quoteToken", {}).get("symbol", "?")
-        price = pair.get("priceUsd", 0)
+        price = float(pair.get("priceUsd", "0") or "0")
         chain = pair.get("chainId", "?")
         dex = pair.get("dexId", "?")
-        vol24 = pair.get("volume", {}).get("h24", 0)
+        vol24 = float(pair.get("volume", {}).get("h24", 0) or 0)
         buys24 = pair.get("txns", {}).get("h24", {}).get("buys", 0)
         sells24 = pair.get("txns", {}).get("h24", {}).get("sells", 0)
-        liq = pair.get("liquidity", {}).get("usd", 0)
+        liq = float(pair.get("liquidity", {}).get("usd", 0) or 0)
 
         desc = (f"链: {chain} | DEX: {dex} | 价格: ${price:,.2f} | "
                 f"24h量: ${vol24:,.0f} | 买{buy24}/卖{sell24} | 流动性: ${liq:,.0f}")
