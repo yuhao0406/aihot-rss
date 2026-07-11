@@ -662,32 +662,50 @@ def format_pct(v):
 
 def build_crypto_items(data):
 
-
-    items=[]
-
+    items = []
 
     for coin in data:
 
+        pct = coin.get(
+            "price_change_percentage_24h",
+            0
+        )
 
-desc = (
-    f"{coin['name']} "
-    f"{coin['symbol'].upper()} "
+        price = coin.get(
+            "current_price",
+            0
+        )
 
-    f"当前价格:"
-    f"¥{coin['current_price']:,.2f} "
+        name = coin.get(
+            "name",
+            ""
+        )
 
-    f"24h:"
-    f"{format_pct(coin['price_change_percentage_24h'])}"
-)
+        symbol = coin.get(
+            "symbol",
+            ""
+        ).upper()
+
+
+        desc = (
+            name
+            + " ("
+            + symbol
+            + ") "
+            + "价格:"
+            + str(price)
+            + " "
+            + "24h:"
+            + format_pct(pct)
+        )
 
 
         items.append(
 
             item_xml(
 
-                "[币]"
-                +
-                coin["name"],
+                "[币] "
+                + name,
 
                 "https://www.coingecko.com/",
 
