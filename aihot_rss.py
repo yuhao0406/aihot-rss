@@ -669,20 +669,16 @@ def build_crypto_items(data):
     for coin in data:
 
 
-        desc=(
+desc = (
+    f"{coin['name']} "
+    f"{coin['symbol'].upper()} "
 
-            f"{coin['name']} "
-            f"{coin['symbol'].upper()}"
+    f"当前价格:"
+    f"¥{coin['current_price']:,.2f} "
 
-            f" 当前价格:"
-            f"¥{coin['current_price']:,.2f}"
-
-            f" 24h:"
-            f"{format_pct("
-            f"coin['price_change_percentage_24h']"
-            f")}"
-
-        )
+    f"24h:"
+    f"{format_pct(coin['price_change_percentage_24h'])}"
+)
 
 
         items.append(
