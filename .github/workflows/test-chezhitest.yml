@@ -8,5 +8,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          curl -s -o /tmp/che.html "https://www.12365auto.com/complaint/index"
-          head -c 500 /tmp/che.html
+          curl -s "https://www.12365auto.com/zlts/0-0-0-0-0-0_0-0-0-0-0-0-0-1.shtml" | head -c 1000
