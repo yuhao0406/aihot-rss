@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
-多合一 RSS：AI热榜 + 加密货币 + 贵金属 + 少数派 + Elon Musk + Naval
+多合一 RSS：AI热榜 + 加密货币 + 贵金属 + 少数派 + Elon + Naval + 化工 + 美联储 + ETF + Saylor + 巨鲸 + Nansen + 车质网
 """
-import json, sys, os, time
+import json, sys, os, time, re
 from datetime import datetime, timedelta, timezone
 from email.utils import format_datetime
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+import xml.etree.ElementTree as ET
+
 def escape(text):
     """安全的 XML 转义，支持中文"""
     text = str(text)
@@ -17,15 +19,13 @@ def escape(text):
     text = text.replace("'", "&apos;")
     return text
 
-import xml.etree.ElementTree as ET
-
 UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
       "AppleWebKit/537.36 (KHTML, like Gecko) "
       "Chrome/124.0.0.0 Safari/537.36 aihot-skill/0.2.0")
 OUTPUT = sys.argv[1] if len(sys.argv) > 1 else "docs/aihot.xml"
 NOW_RFC = format_datetime(datetime.now(timezone.utc))
 
-# ──────────────────── 数据采集 ────────────────────
+# ═══════════════════ 数据采集 ═══════════════════
 
 def fetch_aihot(hours=24, take=30):
     since = (datetime.now(timezone.utc) - timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -53,8 +53,14 @@ def fetch_crypto():
 def fetch_precious_metals():
     url = ("https://push2.eastmoney.com/api/qt/ulist.np/get"
            "?fltt=2&secids=113.aum,113.agm&fields=f2,f3,f4,f6,f12,f14,f58")
-    with urlopen(url, timeout=20) as r:
-        return json.load(r)
+    for attempt in range(3):
+        try:
+            with urlopen(url, timeout=20) as r:
+                return json.load(r)
+        except Exception as e:
+            if attempt == 2:
+                raise e
+            time.sleep(10)
 
 def fetch_rss(url):
     """通用 RSS/Atom 抓取"""
@@ -66,7 +72,6 @@ def fetch_rss(url):
     req = Request(url, headers=headers)
     with urlopen(req, timeout=30) as r:
         raw_bytes = r.read()
-    # 解码
     if raw_bytes[:3] == b'\xef\xbb\xbf':
         raw = raw_bytes[3:].decode('utf-8', errors='replace')
     else:
@@ -74,10 +79,7 @@ def fetch_rss(url):
             raw = raw_bytes.decode('utf-8', errors='replace')
         except:
             raw = raw_bytes.decode('latin-1', errors='replace')
-    import re
     raw = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', raw)
-
-    # 关键：用 bytes 喂给 XML 解析器，避免 ASCII 编码错误
     root = ET.fromstring(raw.encode('utf-8'))
 
     ns = {"atom": "http://www.w3.org/2005/Atom"}
@@ -108,8 +110,21 @@ def fetch_rss(url):
 
     return channel_title, items
 
+def fetch_12365auto(page=1):
+    """车质网投诉列表"""
+    url = f"https://www.12365auto.com/zlts/0-0-0-0-0-0_0-0-0-0-0-0-0-{page}.shtml"
+    req = Request(url, headers={"User-Agent": UA})
+    with urlopen(req, timeout=30) as r:
+        html = r.read().decode("gb2312", errors="replace")
+    items = []
+    pattern = r'<a[^>]*>([^<]+)</a></td><td[^>]*><a[^>]*>([^<]+)</a></td><td>([^<]+)</td><td class="tsjs"><a[^>]*>([^<]+)</a>.*?<td>(\d{4}-\d{2}-\d{2})</td>'
+    matches = re.findall(pattern, html)
+    for brand, series, model, title, date in matches:
+        full_title = f"{brand} {series} {model}: {title}"
+        items.append({"title": full_title.strip(), "link": "https://www.12365auto.com/zlts/", "summary": full_title, "updated": date})
+    return items
 
-# ──────────────────── RSS 构建 ────────────────────
+# ═══════════════════ RSS 条目构建 ═══════════════════
 
 def item_xml(title, link, description, pub_date=None):
     pub = pub_date or NOW_RFC
@@ -157,100 +172,6 @@ def build_metal_items(data):
             description=desc,
         ))
     return items
-def fetch_dexscreener(keyword="BTC"):
-    """DexScreener DEX 交易数据"""
-    url = f"https://api.dexscreener.com/latest/dex/search?q={keyword}"
-    req = Request(url, headers={"User-Agent": UA})
-    with urlopen(req, timeout=20) as r:
-        return json.load(r)
-
-
-def build_dex_items(data, keyword="BTC"):
-    items = []
-    for pair in data.get("pairs", [])[:5]:
-        base = pair.get("baseToken", {}).get("symbol", "?")
-        quote = pair.get("quoteToken", {}).get("symbol", "?")
-        price = float(pair.get("priceUsd", "0") or "0")
-        chain = pair.get("chainId", "?")
-        dex = pair.get("dexId", "?")
-        vol24 = float(pair.get("volume", {}).get("h24", 0) or 0)
-        buys24 = pair.get("txns", {}).get("h24", {}).get("buys", 0)
-        sells24 = pair.get("txns", {}).get("h24", {}).get("sells", 0)
-        liq = float(pair.get("liquidity", {}).get("usd", 0) or 0)
-
-        desc = (f"链: {chain} | DEX: {dex} | 价格: ${price:,.2f} | "
-                f"24h量: ${vol24:,.0f} | 买{buy24}/卖{sell24} | 流动性: ${liq:,.0f}")
-        items.append(item_xml(
-            title=f"[DEX] {base}/{quote} ${price:,.2f} | {chain}/{dex}",
-            link=pair.get("url", "https://dexscreener.com"),
-            description=desc,
-        ))
-    return items
-
-def build_aihot_items(data):
-    items = []
-    for it in data:
-        t = it.get("title") or it.get("name") or "(无标题)"
-        u = it.get("url") or it.get("link") or "https://aihot.virxact.com/"
-        s = it.get("summary") or it.get("description") or it.get("excerpt") or t
-        pub = it.get("published_at") or it.get("created_at")
-        try:
-            dt = datetime.fromisoformat(pub.replace("Z","+00:00")) if pub else None
-            rfc = format_datetime(dt) if dt else NOW_RFC
-        except:
-            rfc = NOW_RFC
-        items.append(item_xml(f"[AI] {t}", u, s, pub_date=rfc))
-    return items
-
-def build_rss_items(raw_items, source_label, source_name, default_link):
-    """将通用 RSS item 转为标准 XML 条目，推文摘要截短"""
-    items = []
-    for ri in raw_items:
-        t = ri["title"].encode('utf-8', errors='replace').decode('utf-8')
-
-        # Twitter 推文通常内容很长，摘要只取前200字符
-        s = ri["summary"]
-        # 去掉 HTML 标签
-        import re
-        s = re.sub(r'<[^>]+>', '', s)
-        s = s.encode('utf-8', errors='replace').decode('utf-8')  # 新增
-
-        s = s[:300].strip()
-        if len(s) >= 300:
-            s += "..."
-
-        u = ri["link"] or default_link
-        pub = ri["updated"]
-        try:
-            dt = None
-            for fmt in ["%a, %d %b %Y %H:%M:%S %z", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%SZ"]:
-                try:
-                    dt = datetime.strptime(pub, fmt) if pub else None
-                    break
-                except:
-                    continue
-            rfc = format_datetime(dt) if dt else NOW_RFC
-        except:
-            rfc = NOW_RFC
-        items.append(item_xml(f"[{source_label}] {t}", u, s, pub_date=rfc))
-    return items
-
-# ──────────────────── 主流程 ────────────────────
-
-def fetch_12365auto(page=1):
-    """车质网投诉列表"""
-    url = f"https://www.12365auto.com/zlts/0-0-0-0-0-0_0-0-0-0-0-0-0-{page}.shtml"
-    req = Request(url, headers={"User-Agent": UA})
-    with urlopen(req, timeout=30) as r:
-        html = r.read().decode("gb2312", errors="replace")
-    items = []
-    import re
-    pattern = r'<a[^>]*>([^<]+)</a></td><td[^>]*><a[^>]*>([^<]+)</a></td><td>([^<]+)</td><td class="tsjs"><a[^>]*>([^<]+)</a>.*?<td>(\d{4}-\d{2}-\d{2})</td>'
-    matches = re.findall(pattern, html)
-    for brand, series, model, title, date in matches:
-        full_title = f"{brand} {series} {model}: {title}"
-        items.append({"title": full_title.strip(), "link": f"https://www.12365auto.com/zlts/", "summary": full_title, "updated": date})
-    return items
 
 def build_12365_items(data):
     items_xml = []
@@ -268,13 +189,57 @@ def build_12365_items(data):
         ))
     return items_xml
 
+def build_aihot_items(data):
+    items = []
+    for it in data:
+        t = it.get("title") or it.get("name") or "(无标题)"
+        u = it.get("url") or it.get("link") or "https://aihot.virxact.com/"
+        s = it.get("summary") or it.get("description") or it.get("excerpt") or t
+        pub = it.get("published_at") or it.get("created_at")
+        try:
+            dt = datetime.fromisoformat(pub.replace("Z", "+00:00")) if pub else None
+            rfc = format_datetime(dt) if dt else NOW_RFC
+        except:
+            rfc = NOW_RFC
+        items.append(item_xml(f"[AI] {t}", u, s, pub_date=rfc))
+    return items
+
+def build_rss_items(raw_items, source_label, source_name, default_link):
+    """将通用 RSS item 转为标准 XML 条目"""
+    items = []
+    for ri in raw_items:
+        t = ri["title"].encode('utf-8', errors='replace').decode('utf-8')
+        s = ri["summary"]
+        s = re.sub(r'<[^>]+>', '', s)
+        s = s.encode('utf-8', errors='replace').decode('utf-8')
+        s = s[:300].strip()
+        if len(s) >= 300:
+            s += "..."
+        u = ri["link"] or default_link
+        pub = ri["updated"]
+        try:
+            dt = None
+            for fmt in ["%a, %d %b %Y %H:%M:%S %z", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%SZ"]:
+                try:
+                    dt = datetime.strptime(pub, fmt) if pub else None
+                    break
+                except:
+                    continue
+            rfc = format_datetime(dt) if dt else NOW_RFC
+        except:
+            rfc = NOW_RFC
+        items.append(item_xml(f"[{source_label}] {t}", u, s, pub_date=rfc))
+    return items
+
+# ═══════════════════ 主流程 ═══════════════════
+
+def main():
     parts = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<rss version="2.0"><channel>',
-        '<title>综合热榜（AI + 币价 + 期货 + 少数派 + Elon + Naval + 化工塑料）</title>',
+        '<title>综合热榜（AI+币价+期货+新闻+宏观+ETF+巨鲸+车质网）</title>',
         '<link>https://github.com/yuhao0406/aihot-rss</link>',
-        '<description>AI精选、加密行情、贵金属期货、少数派数码、Elon Musk &amp; Naval 推文、化工塑料新闻，每小时更新</description>',
-
+        '<description>AI精选、加密行情、贵金属、少数派、Elon/Naval、化工、美联储、ETF、Whale、Nansen、车质网投诉</description>',
         f'<lastBuildDate>{NOW_RFC}</lastBuildDate>',
     ]
 
@@ -305,91 +270,68 @@ def build_12365_items(data):
     except Exception as e:
         errors.append(f"少数派: {e}")
 
-    # 5. Elon Musk 推文
+    # 5. Elon Musk
     try:
         _, elon_items = fetch_rss("https://rss.941009.xyz/twitter/user/elonmusk")
         parts.extend(build_rss_items(elon_items[:10], "Elon Musk", "Elon Musk", "https://x.com/elonmusk"))
     except Exception as e:
         errors.append(f"Elon Musk: {e}")
 
-    # 6. Naval 推文
+    # 6. Naval
     try:
         _, naval_items = fetch_rss("https://rss.941009.xyz/twitter/user/naval")
         parts.extend(build_rss_items(naval_items[:10], "Naval", "Naval", "https://x.com/naval"))
     except Exception as e:
         errors.append(f"Naval: {e}")
 
-    # 7. 美通社能源化工环保
+    # 7. 美通社化工
     try:
         _, prn_items = fetch_rss("https://www.prnasia.com/story/industry-group/4-1.rss")
-        parts.extend(build_rss_items(prn_items[:8], "化工", "美通社能源化工", "https://www.prnasia.com/story/industry-group/4-1.rss"))
+        parts.extend(build_rss_items(prn_items[:8], "化工", "美通社", "https://www.prnasia.com/story/industry-group/4-1.rss"))
     except Exception as e:
-        errors.append(f"美通社化工: {e}")
-        
-    # 8. 美联储货币政策声明
+        errors.append(f"美通社: {e}")
+
+    # 8. 美联储
     try:
         _, fed_items = fetch_rss("https://www.federalreserve.gov/feeds/press_monetary.xml")
-        parts.extend(build_rss_items(fed_items[:5], "美联储", "美联储声明", "https://www.federalreserve.gov/newsevents/pressreleases.htm"))
+        parts.extend(build_rss_items(fed_items[:5], "美联储", "美联储", "https://www.federalreserve.gov/newsevents/pressreleases.htm"))
     except Exception as e:
         errors.append(f"美联储: {e}")
 
-    # 9. 巴菲特 Berkshire 13F 持仓报告
-    #try:
-       # _, brk_items = fetch_rss("https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001067983&type=13F-HR&dateb=&owner=exclude&count=40&output=atom")
-        #parts.extend(build_rss_items(brk_items[:5], "巴菲特13F", "Berkshire持仓", "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001067983&type=13F"))
-    #except Exception as e:
-        #errors.append(f"巴菲特13F: {e}")
-        
-    # 10. Farside Investors — BTC/ETH/SOL ETF 资金流
+    # 9. Farside ETF
     try:
         _, farside_items = fetch_rss("https://rss.941009.xyz/twitter/user/FarsideUK")
-        parts.extend(build_rss_items(farside_items[:8], "ETF资金", "Farside ETF", "https://x.com/FarsideUK"))
+        parts.extend(build_rss_items(farside_items[:8], "ETF资金", "Farside", "https://x.com/FarsideUK"))
     except Exception as e:
         errors.append(f"Farside ETF: {e}")
 
-    # 11. Michael Saylor — Strategy 持仓/BTC 观点
+    # 10. Saylor
     try:
         _, saylor_items = fetch_rss("https://rss.941009.xyz/twitter/user/saylor")
-        parts.extend(build_rss_items(saylor_items[:5], "Saylor", "Saylor BTC", "https://x.com/saylor"))
+        parts.extend(build_rss_items(saylor_items[:5], "Saylor", "Saylor", "https://x.com/saylor"))
     except Exception as e:
         errors.append(f"Saylor: {e}")
 
-    # 12. Whale Alert — 巨鲸转账
+    # 11. Whale Alert
     try:
         _, whale_items = fetch_rss("https://rss.941009.xyz/twitter/user/whale_alert")
-        parts.extend(build_rss_items(whale_items[:8], "巨鲸", "Whale Alert", "https://x.com/whale_alert"))
+        parts.extend(build_rss_items(whale_items[:8], "巨鲸", "Whale", "https://x.com/whale_alert"))
     except Exception as e:
         errors.append(f"Whale Alert: {e}")
 
-    # 13. Nansen AI — Smart Money 公告
+    # 12. Nansen
     try:
         _, nansen_items = fetch_rss("https://rss.941009.xyz/twitter/user/nansen_ai")
         parts.extend(build_rss_items(nansen_items[:5], "SmartMoney", "Nansen", "https://x.com/nansen_ai"))
     except Exception as e:
         errors.append(f"Nansen: {e}")
 
-    # 14. DexScreener DEX 数据
-    try:
-        dex_data = fetch_dexscreener("BTC")
-        parts.extend(build_dex_items(dex_data, "BTC"))
-    except Exception as e:
-        errors.append(f"DexScreener: {e}")
-        
-        # 15. 车质网投诉
+    # 13. 车质网投诉
     try:
         auto_items = fetch_12365auto(1)
-        parts.extend(build_12345_items(auto_items[:10]))
+        parts.extend(build_12365_items(auto_items[:10]))
     except Exception as e:
         errors.append(f"车质网: {e}")
-
-
-
-
-
-
-
-
-
 
     parts.append("</channel></rss>")
 
