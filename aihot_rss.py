@@ -238,6 +238,37 @@ def build_rss_items(raw_items, source_label, source_name, default_link):
 # ──────────────────── 主流程 ────────────────────
 
 def main():
+    def fetch_12365auto(page=1):
+    """车质网投诉列表"""
+    url = f"https://www.12365auto.com/zlts/0-0-0-0-0-0_0-0-0-0-0-0-0-{page}.shtml"
+    req = Request(url, headers={"User-Agent": UA})
+    with urlopen(req, timeout=30) as r:
+        html = r.read().decode("gb2312", errors="replace")
+    items = []
+    import re
+    pattern = r'<a[^>]*>([^<]+)</a></td><td[^>]*><a[^>]*>([^<]+)</a></td><td>([^<]+)</td><td class="tsjs"><a[^>]*>([^<]+)</a>.*?<td>(\d{4}-\d{2}-\d{2})</td>'
+    matches = re.findall(pattern, html)
+    for brand, series, model, title, date in matches:
+        full_title = f"{brand} {series} {model}: {title}"
+        items.append({"title": full_title.strip(), "link": f"https://www.12365auto.com/zlts/", "summary": full_title, "updated": date})
+    return items
+
+def build_12365_items(data):
+    items_xml = []
+    for it in data:
+        try:
+            dt = datetime.strptime(it["updated"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            rfc = format_datetime(dt)
+        except:
+            rfc = NOW_RFC
+        items_xml.append(item_xml(
+            title=f"[车质网] {it['title']}",
+            link="https://www.12365auto.com/zlts/",
+            description=it["title"],
+            pub_date=rfc
+        ))
+    return items_xml
+
     parts = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<rss version="2.0"><channel>',
@@ -344,6 +375,14 @@ def main():
         parts.extend(build_dex_items(dex_data, "BTC"))
     except Exception as e:
         errors.append(f"DexScreener: {e}")
+        
+        # 15. 车质网投诉
+    try:
+        auto_items = fetch_12365auto(1)
+        parts.extend(build_12345_items(auto_items[:10]))
+    except Exception as e:
+        errors.append(f"车质网: {e}")
+
 
 
 
