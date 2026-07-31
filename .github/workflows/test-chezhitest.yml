@@ -1,0 +1,12 @@
+name: test 12365auto
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          curl -s -o /tmp/che.html "https://www.12365auto.com/complaint/index"
+          head -c 500 /tmp/che.html
