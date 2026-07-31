@@ -237,7 +237,6 @@ def build_rss_items(raw_items, source_label, source_name, default_link):
 
 # ──────────────────── 主流程 ────────────────────
 
-def main():
 def fetch_12365auto(page=1):
     """车质网投诉列表"""
     url = f"https://www.12365auto.com/zlts/0-0-0-0-0-0_0-0-0-0-0-0-0-{page}.shtml"
