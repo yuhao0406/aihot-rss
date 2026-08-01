@@ -191,7 +191,7 @@ def build_metal_items(data):
         ))
     return items
 
-def build_12365_items(data):
+def build_12365_items(data, label="车质网"):
     items_xml = []
     for it in data:
         try:
@@ -200,9 +200,9 @@ def build_12365_items(data):
         except:
             rfc = NOW_RFC
         items_xml.append(item_xml(
-            title=f"[车质网] {it['title']}",
-            link="https://www.12365auto.com/zlts/",
-            description=it["title"],
+            title=f"[{label}] {it['title']}",
+            link=it.get("link", "https://www.12365auto.com/zlts/"),
+            description=it.get("summary", it["title"]),
             pub_date=rfc
         ))
     return items_xml
@@ -347,7 +347,7 @@ def main():
     # 13. 车质网投诉
     try:
         auto_items = fetch_12365auto(1)
-        parts.extend(build_12365_items(auto_items[:30]))
+        parts.extend(build_12365_items(auto_items[:30], label="车投诉"))
     except Exception as e:
         errors.append(f"车质网: {e}")
 
