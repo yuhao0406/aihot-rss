@@ -116,13 +116,12 @@ def fetch_12365auto(page=1):
     req = Request(url, headers={"User-Agent": UA})
     with urlopen(req, timeout=30) as r:
         raw_bytes = r.read()
-    # 车质网实际返回的是UTF-8（尽管meta声明gb2312）
     html = raw_bytes.decode("utf-8", errors="replace")
     items = []
-    pattern = r'<a[^>]*>([^<]+)</a></td><td[^>]*><a[^>]*>([^<]+)</a></td><td>([^<]+)</td><td class="tsjs"><a[^>]*>([^<]+)</a>.*?<td>(\d{4}-\d{2}-\d{2})</td>'
+    pattern = r'<a[^>]*>([^<]+)</a></td><td[^>]*><a[^>]*>([^<]+)</a></td><td>([^<]+)</td><td class="tsjs"><a[^>]*>([^<]+)</a>.*?<td class="tsgztj"[^>]*>(.*?)</td>.*?<td>(\d{4}-\d{2}-\d{2})</td>'
     matches = re.findall(pattern, html)
-    for brand, series, model, title, date in matches:
-        full_title = f"{brand.strip()} {series.strip()} {model.strip()}: {title.strip()}"
+    for brand, series, model, title, problem, date in matches:
+        full_title = f"{brand.strip()} {series.strip()} {model.strip()}: {title.strip()}【{problem.strip()}】"
         items.append({"title": full_title, "link": "https://www.12365auto.com/zlts/", "summary": full_title, "updated": date})
     return items
 
