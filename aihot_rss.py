@@ -121,7 +121,7 @@ def fetch_12365auto(page=1):
         f.write(raw_bytes)
         tmp_in = f.name
     tmp_out = tmp_in + ".utf8"
-    subprocess.run(["iconv", "-f", "gb18030", "-t", "utf-8", tmp_in, "-o", tmp_out], check=True)
+    subprocess.run(["iconv", "-f", "gb18030", "-t", "utf-8", "-c", tmp_in, "-o", tmp_out], check=True)
     with open(tmp_out, "r", encoding="utf-8") as f:
         html = f.read()
     os.unlink(tmp_in)
