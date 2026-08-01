@@ -116,7 +116,7 @@ def fetch_12365auto(page=1):
     req = Request(url, headers={"User-Agent": UA})
     with urlopen(req, timeout=30) as r:
         raw_bytes = r.read()
-    html = raw_bytes.decode("gbk", errors="replace")
+    html = raw_bytes.decode("gb2312", errors="replace")
     items = []
     pattern = r'<a[^>]*>([^<]+)</a></td><td[^>]*><a[^>]*>([^<]+)</a></td><td>([^<]+)</td><td class="tsjs"><a[^>]*>([^<]+)</a>.*?<td>(\d{4}-\d{2}-\d{2})</td>'
     matches = re.findall(pattern, html)
