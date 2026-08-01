@@ -111,22 +111,13 @@ def fetch_rss(url):
     return channel_title, items
 
 def fetch_12365auto(page=1):
-    """车质网投诉列表 - iconv 全文件转码"""
-    import subprocess, tempfile
+    """车质网投诉列表"""
     url = f"https://www.12365auto.com/zlts/0-0-0-0-0-0_0-0-0-0-0-0-0-{page}.shtml"
     req = Request(url, headers={"User-Agent": UA})
     with urlopen(req, timeout=30) as r:
-        raw = r.read()
-    tmp_in = tempfile.NamedTemporaryFile(suffix=".html", delete=False)
-    tmp_in.write(raw)
-    tmp_in.close()
-    tmp_out = tempfile.NamedTemporaryFile(suffix=".html", delete=False)
-    tmp_out.close()
-    subprocess.run(["iconv", "-f", "gb2312", "-t", "utf-8", "-o", tmp_out.name, tmp_in.name], check=False)
-    with open(tmp_out.name, "r", encoding="utf-8") as f:
-        html = f.read()
-    os.unlink(tmp_in.name)
-    os.unlink(tmp_out.name)
+        raw_bytes = r.read()
+    # 车质网实际返回的是UTF-8（尽管meta声明gb2312）
+    html = raw_bytes.decode("utf-8", errors="replace")
     items = []
     pattern = r'<a[^>]*>([^<]+)</a></td><td[^>]*><a[^>]*>([^<]+)</a></td><td>([^<]+)</td><td class="tsjs"><a[^>]*>([^<]+)</a>.*?<td>(\d{4}-\d{2}-\d{2})</td>'
     matches = re.findall(pattern, html)
