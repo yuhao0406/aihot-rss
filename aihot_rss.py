@@ -125,6 +125,23 @@ def fetch_12365auto(page=1):
         items.append({"title": full_title, "link": "https://www.12365auto.com/zlts/", "summary": full_title, "updated": date})
     return items
 
+def fetch_12365auto_news(page=1):
+    """车质网资讯列表"""
+    url = f"https://www.12365auto.com/all/index_{page}.shtml"
+    req = Request(url, headers={"User-Agent": UA})
+    with urlopen(req, timeout=30) as r:
+        raw_bytes = r.read()
+    html = raw_bytes.decode("utf-8", errors="replace")
+    items = []
+    pattern = r'<div class="news_nr">\s*<h2><a href="([^"]+)"[^>]*>([^<]+)</a></h2>.*?<div class="show_nr">\s*([^<]+)\s*</div>.*?<span>(\d{4}-\d{2}-\d{2}\s\d{2}:\d{2})</span>'
+    matches = re.findall(pattern, html, re.DOTALL)
+    for url, title, summary, date in matches:
+        full_title = f"{title.strip()}（{summary.strip()}）"
+        link = url if url.startswith("http") else f"https://www.12365auto.com{url}"
+        items.append({"title": full_title, "link": link, "summary": summary.strip(), "updated": date})
+    return items
+
+
 # ═══════════════════ RSS 条目构建 ═══════════════════
 
 def item_xml(title, link, description, pub_date=None):
@@ -333,6 +350,14 @@ def main():
         parts.extend(build_12365_items(auto_items[:30]))
     except Exception as e:
         errors.append(f"车质网: {e}")
+
+    # 14. 车质网资讯
+    try:
+        news_items = fetch_12365auto_news(1)
+        parts.extend(build_12365_items(news_items[:10]))
+    except Exception as e:
+        errors.append(f"车质网资讯: {e}")
+
 
     parts.append("</channel></rss>")
 
