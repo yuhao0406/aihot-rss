@@ -115,21 +115,20 @@ def fetch_12365auto(page=1):
     url = f"https://www.12365auto.com/zlts/0-0-0-0-0-0_0-0-0-0-0-0-0-{page}.shtml"
     req = Request(url, headers={"User-Agent": UA})
     with urlopen(req, timeout=30) as r:
-        html = r.read().decode("gb2312", errors="replace")
+        raw_bytes = r.read()
+    html = raw_bytes.decode("gbk", errors="replace")
     items = []
     pattern = r'<a[^>]*>([^<]+)</a></td><td[^>]*><a[^>]*>([^<]+)</a></td><td>([^<]+)</td><td class="tsjs"><a[^>]*>([^<]+)</a>.*?<td>(\d{4}-\d{2}-\d{2})</td>'
     matches = re.findall(pattern, html)
     for brand, series, model, title, date in matches:
+        brand = brand.strip()
+        series = series.strip()
+        model = model.strip()
+        title = title.strip()
         full_title = f"{brand} {series} {model}: {title}"
-        brand = brand.encode('latin-1').decode('gb2312', errors='replace')
-        series = series.encode('latin-1').decode('gb2312', errors='replace')
-        model = model.encode('latin-1').decode('gb2312', errors='replace')
-        title = title.encode('latin-1').decode('gb2312', errors='replace')
-        # GB2312 → UTF-8 修复
-        full_title = full_title.encode('latin-1').decode('gb2312', errors='replace')
-        items.append({"title": full_title.strip(), "link": "https://www.12365auto.com/zlts/", "summary": full_title, "updated": date})
-
+        items.append({"title": full_title, "link": f"https://www.12365auto.com/zlts/", "summary": full_title, "updated": date})
     return items
+
 
 # ═══════════════════ RSS 条目构建 ═══════════════════
 
