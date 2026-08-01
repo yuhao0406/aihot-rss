@@ -112,20 +112,24 @@ def fetch_rss(url):
 
 def fetch_12365auto(page=1):
     """车质网投诉列表"""
-    import subprocess, tempfile
     url = f"https://www.12365auto.com/zlts/0-0-0-0-0-0_0-0-0-0-0-0-0-{page}.shtml"
     req = Request(url, headers={"User-Agent": UA})
     with urlopen(req, timeout=30) as r:
         raw_bytes = r.read()
-    with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as f:
-        f.write(raw_bytes)
-        tmp_in = f.name
-    tmp_out = tmp_in + ".utf8"
-    subprocess.run(["iconv", "-f", "gb18030", "-t", "utf-8", "-c", tmp_in, "-o", tmp_out], check=True)
-    with open(tmp_out, "r", encoding="utf-8") as f:
-        html = f.read()
-    os.unlink(tmp_in)
-    os.unlink(tmp_out)
+    # 去掉 BOM + 尝试多种解码
+    if raw_bytes[:3] == b'\xef\xbb\xbf':
+        raw_bytes = raw_bytes[3:]
+    html = None
+    for enc in ["gb18030", "gbk", "gb2312"]:
+        try:
+            decoded = raw_bytes.decode(enc)
+            if "投诉编号" in decoded or "投诉" in decoded:
+                html = decoded
+                break
+        except:
+            continue
+    if html is None:
+        html = raw_bytes.decode("gb18030", errors="replace")
     items = []
     pattern = r'<a[^>]*>([^<]+)</a></td><td[^>]*><a[^>]*>([^<]+)</a></td><td>([^<]+)</td><td class="tsjs"><a[^>]*>([^<]+)</a>.*?<td>(\d{4}-\d{2}-\d{2})</td>'
     matches = re.findall(pattern, html)
