@@ -8,5 +8,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          curl -s "https://www.12365auto.com/all/index_1.shtml" | grep -oP 'class="[^"]*new[^"]*"' | sort -u
+          curl -s "https://www.12365auto.com/all/index_1.shtml" | grep -oP 'class="news_li"[^>]*>.*?</a>' | head -10
 
