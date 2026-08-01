@@ -330,7 +330,7 @@ def main():
     # 13. 车质网投诉
     try:
         auto_items = fetch_12365auto(1)
-        parts.extend(build_12365_items(auto_items[:10]))
+        parts.extend(build_12365_items(auto_items[:30]))
     except Exception as e:
         errors.append(f"车质网: {e}")
 
