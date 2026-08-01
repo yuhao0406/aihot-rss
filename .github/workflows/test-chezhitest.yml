@@ -8,4 +8,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          curl -s "https://www.12365auto.com/all/index_1.shtml" | grep -oP '<a[^>]*href="//www.12365auto.com/[^"]*"[^>]*>.*?</a>' | head -10
+          curl -s "https://www.12365auto.com/all/index_1.shtml" | tail -c +2000 | head -c 3000
