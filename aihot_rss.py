@@ -111,34 +111,27 @@ def fetch_rss(url):
     return channel_title, items
 
 def fetch_12365auto(page=1):
-    """车质网投诉列表"""
+    """车质网投诉列表 - iconv 全文件转码"""
+    import subprocess, tempfile
     url = f"https://www.12365auto.com/zlts/0-0-0-0-0-0_0-0-0-0-0-0-0-{page}.shtml"
     req = Request(url, headers={"User-Agent": UA})
     with urlopen(req, timeout=30) as r:
-        raw_bytes = r.read()
-    # 去掉 BOM + 尝试多种解码
-    if raw_bytes[:3] == b'\xef\xbb\xbf':
-        raw_bytes = raw_bytes[3:]
-    html = None
-    for enc in ["gb18030", "gbk", "gb2312"]:
-        try:
-            decoded = raw_bytes.decode(enc)
-            if "投诉编号" in decoded or "投诉" in decoded:
-                html = decoded
-                break
-        except:
-            continue
-    if html is None:
-        html = raw_bytes.decode("gb18030", errors="replace")
+        raw = r.read()
+    tmp_in = tempfile.NamedTemporaryFile(suffix=".html", delete=False)
+    tmp_in.write(raw)
+    tmp_in.close()
+    tmp_out = tempfile.NamedTemporaryFile(suffix=".html", delete=False)
+    tmp_out.close()
+    subprocess.run(["iconv", "-f", "gb2312", "-t", "utf-8", "-o", tmp_out.name, tmp_in.name], check=False)
+    with open(tmp_out.name, "r", encoding="utf-8") as f:
+        html = f.read()
+    os.unlink(tmp_in.name)
+    os.unlink(tmp_out.name)
     items = []
     pattern = r'<a[^>]*>([^<]+)</a></td><td[^>]*><a[^>]*>([^<]+)</a></td><td>([^<]+)</td><td class="tsjs"><a[^>]*>([^<]+)</a>.*?<td>(\d{4}-\d{2}-\d{2})</td>'
     matches = re.findall(pattern, html)
     for brand, series, model, title, date in matches:
         full_title = f"{brand.strip()} {series.strip()} {model.strip()}: {title.strip()}"
-        try:
-            full_title = full_title.encode('latin-1').decode('utf-8')
-        except:
-            pass
         items.append({"title": full_title, "link": "https://www.12365auto.com/zlts/", "summary": full_title, "updated": date})
     return items
 
