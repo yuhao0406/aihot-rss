@@ -112,18 +112,20 @@ def fetch_rss(url):
 
 def fetch_12365auto(page=1):
     """车质网投诉列表"""
+    import subprocess, tempfile
     url = f"https://www.12365auto.com/zlts/0-0-0-0-0-0_0-0-0-0-0-0-0-{page}.shtml"
     req = Request(url, headers={"User-Agent": UA})
     with urlopen(req, timeout=30) as r:
         raw_bytes = r.read()
-    # 尝试验测多种编码
-    for enc in ["gb18030", "gbk", "gb2312", "utf-8", "latin-1"]:
-        try:
-            html = raw_bytes.decode(enc)
-            if "比亚迪" in html or "投诉" in html:
-                break
-        except:
-            continue
+    with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as f:
+        f.write(raw_bytes)
+        tmp_in = f.name
+    tmp_out = tmp_in + ".utf8"
+    subprocess.run(["iconv", "-f", "gb18030", "-t", "utf-8", tmp_in, "-o", tmp_out], check=True)
+    with open(tmp_out, "r", encoding="utf-8") as f:
+        html = f.read()
+    os.unlink(tmp_in)
+    os.unlink(tmp_out)
     items = []
     pattern = r'<a[^>]*>([^<]+)</a></td><td[^>]*><a[^>]*>([^<]+)</a></td><td>([^<]+)</td><td class="tsjs"><a[^>]*>([^<]+)</a>.*?<td>(\d{4}-\d{2}-\d{2})</td>'
     matches = re.findall(pattern, html)
@@ -131,7 +133,6 @@ def fetch_12365auto(page=1):
         full_title = f"{brand.strip()} {series.strip()} {model.strip()}: {title.strip()}"
         items.append({"title": full_title, "link": "https://www.12365auto.com/zlts/", "summary": full_title, "updated": date})
     return items
-
 
 # ═══════════════════ RSS 条目构建 ═══════════════════
 
