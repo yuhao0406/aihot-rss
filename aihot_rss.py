@@ -116,17 +116,20 @@ def fetch_12365auto(page=1):
     req = Request(url, headers={"User-Agent": UA})
     with urlopen(req, timeout=30) as r:
         raw_bytes = r.read()
-    html = raw_bytes.decode("gb2312", errors="replace")
+    # 尝试验测多种编码
+    for enc in ["gb18030", "gbk", "gb2312", "utf-8", "latin-1"]:
+        try:
+            html = raw_bytes.decode(enc)
+            if "比亚迪" in html or "投诉" in html:
+                break
+        except:
+            continue
     items = []
     pattern = r'<a[^>]*>([^<]+)</a></td><td[^>]*><a[^>]*>([^<]+)</a></td><td>([^<]+)</td><td class="tsjs"><a[^>]*>([^<]+)</a>.*?<td>(\d{4}-\d{2}-\d{2})</td>'
     matches = re.findall(pattern, html)
     for brand, series, model, title, date in matches:
-        brand = brand.strip()
-        series = series.strip()
-        model = model.strip()
-        title = title.strip()
-        full_title = f"{brand} {series} {model}: {title}"
-        items.append({"title": full_title, "link": f"https://www.12365auto.com/zlts/", "summary": full_title, "updated": date})
+        full_title = f"{brand.strip()} {series.strip()} {model.strip()}: {title.strip()}"
+        items.append({"title": full_title, "link": "https://www.12365auto.com/zlts/", "summary": full_title, "updated": date})
     return items
 
 
