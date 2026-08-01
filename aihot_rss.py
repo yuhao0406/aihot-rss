@@ -135,6 +135,10 @@ def fetch_12365auto(page=1):
     matches = re.findall(pattern, html)
     for brand, series, model, title, date in matches:
         full_title = f"{brand.strip()} {series.strip()} {model.strip()}: {title.strip()}"
+        try:
+            full_title = full_title.encode('latin-1').decode('utf-8')
+        except:
+            pass
         items.append({"title": full_title, "link": "https://www.12365auto.com/zlts/", "summary": full_title, "updated": date})
     return items
 
