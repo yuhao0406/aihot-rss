@@ -8,4 +8,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          curl -s "https://www.12365auto.com/all/index_1.shtml" | grep -oP '<div[^>]*class="news_li"[^>]*>.*?</div>' | head -5
+          curl -s "https://www.12365auto.com/all/index_1.shtml" | sed 's/\(news_li\)/\n\1/' | tail -n +2 | head -c 5000
