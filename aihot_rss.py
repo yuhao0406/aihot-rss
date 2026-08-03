@@ -6,7 +6,7 @@ import json, sys, os, time, re
 from datetime import datetime, timedelta, timezone
 from email.utils import format_datetime
 from urllib.parse import urlencode
-from urllib.request import Request, urlopen
+from urllib.request import Request, urlopen, build_opener, HTTPCookieProcessor
 import xml.etree.ElementTree as ET
 
 def escape(text):
@@ -140,6 +140,35 @@ def fetch_12365auto_news(page=1):
         link = url if url.startswith("http") else f"https://www.12365auto.com{url}"
         items.append({"title": full_title, "link": link, "summary": summary.strip(), "updated": date})
     return items
+
+def fetch_chemnet():
+    """化工网商品情报"""
+    import http.cookiejar
+    url = "https://china.chemnet.com/fx/intelligence.php"
+    cj = http.cookiejar.CookieJar()
+    opener = build_opener(HTTPCookieProcessor(cj))
+    opener.addheaders = [("User-Agent", UA)]
+    resp = opener.open(url)
+    html = resp.read().decode("gb2312", errors="replace")
+    items = []
+    pattern = r'<span class="mr-2 qb-time">([^<]+)</span>.*?<a class="btn-yl">([^<]+)</a>.*?<p class="mt-1 btn-yl">([^<]+)</p>'
+    matches = re.findall(pattern, html, re.DOTALL)
+    for time_str, category, content in matches:
+        full_title = f"{category.strip()} {content.strip()[:80]}"
+        items.append({"title": full_title, "link": "http://china.chemnet.com/fx/intelligence.php", "summary": content.strip(), "updated": time_str.strip()})
+    return items
+
+def build_chem_items(data):
+    items_xml = []
+    for it in data:
+        items_xml.append(item_xml(
+            title=f"[化工网] {it['title']}",
+            link=it["link"],
+            description=it["summary"],
+            pub_date=NOW_RFC
+        ))
+    return items_xml
+
 
 
 # ═══════════════════ RSS 条目构建 ═══════════════════
@@ -357,6 +386,14 @@ def main():
         parts.extend(build_12365_items(news_items[:10]))
     except Exception as e:
         errors.append(f"车质网资讯: {e}")
+
+        # 15. 化工网商品情报
+    try:
+        chem_items = fetch_chemnet()
+        parts.extend(build_chem_items(chem_items[:10]))
+    except Exception as e:
+        errors.append(f"化工网: {e}")
+
 
 
     parts.append("</channel></rss>")
