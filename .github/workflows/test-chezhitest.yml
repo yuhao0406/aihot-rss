@@ -1,8 +1,9 @@
-name: test chemnet
-on:
-  workflow_dispatch:
+name: test-chemnet
+
+on: workflow_dispatch
+
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - run: curl -s "https://china.chemnet.com/fx/intelligence.php" -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)" | head -c 1000
+      - run: curl -s "https://china.chemnet.com/fx/intelligence.php" -H "User-Agent: Mozilla/5.0" | head -c 1000
