@@ -8,4 +8,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          curl -s "https://www.icis.com/explore/resources/news/" -H "User-Agent: Mozilla/5.0" | head -c 3000
+          curl -s "https://www.icis.com/explore/feed/" | head -c 2000
