@@ -8,4 +8,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          curl -s "https://www.12365auto.com/all/index_1.shtml" | sed 's/\(news_li\)/\n\1/' | tail -n +2 | head -c 5000
+          curl -s "https://www.icis.com/explore/resources/news/" -H "User-Agent: Mozilla/5.0" | head -c 3000
