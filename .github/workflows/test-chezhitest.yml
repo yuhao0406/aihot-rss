@@ -8,5 +8,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          curl -s "https://www.icis.com/explore/resources/news/feed/" | head -c 2000
-
+          curl -s "https://www.icis.com/explore/category/news/feed/" | head -c 2000
