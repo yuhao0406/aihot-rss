@@ -1,11 +1,10 @@
-name: test-che
-
+name: test chemnet
 on:
   workflow_dispatch:
-
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          curl -s "https://www.icis.com/explore/category/news/feed/" | head -c 2000
+          curl -s -c /tmp/cookie.txt "https://china.chemnet.com/fx/intelligence.php"
+          curl -s -b /tmp/cookie.txt "https://china.chemnet.com/fx/intelligence.php" | head -c 2000
