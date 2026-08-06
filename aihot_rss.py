@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-多合一 RSS：AI热榜 + 加密货币 + 贵金属 + 少数派 + Elon + Naval + 化工 + 美联储 + ETF + Saylor + 巨鲸 + Nansen + 车质网
+多合一 RSS：AI热榜 + 加密货币 + 贵金属 + 少数派 + Elon + Naval + 化工 + 美联储 + ETF + Saylor + 巨鲸 + Nansen + 车质网 + OKX快讯
 """
 import json, sys, os, time, re
 from datetime import datetime, timedelta, timezone
@@ -158,17 +158,111 @@ def fetch_chemnet():
         items.append({"title": full_title, "link": "http://china.chemnet.com/fx/intelligence.php", "summary": content.strip(), "updated": time_str.strip()})
     return items
 
-def build_chem_items(data):
-    items_xml = []
-    for it in data:
-        items_xml.append(item_xml(
-            title=f"[化工网] {it['title']}",
-            link=it["link"],
-            description=it["summary"],
-            pub_date=NOW_RFC
-        ))
-    return items_xml
+def fetch_okx_news():
+    """OKX 星球快讯 —— 从 SSR 内嵌 JSON (script#appState) 中提取"""
+    url = "https://www.okx.com/zh-hans/orbit/news"
+    req = Request(url, headers={"User-Agent": UA})
+    for attempt in range(3):
+        try:
+            with urlopen(req, timeout=30) as r:
+                raw_bytes = r.read()
+            break
+        except Exception as e:
+            if attempt == 2:
+                print(f"[OKX] 3次请求均失败: {e}")
+                return []
+            print(f"[OKX] 第{attempt+1}次失败，10秒后重试: {e}")
+            time.sleep(10)
 
+    html = raw_bytes.decode("utf-8", errors="replace")
+
+    # 从 <script id="appState"> 提取 JSON
+    match = re.search(r'<script[^>]+id="appState"[^>]*>\s*(.*?)\s*</script>', html, re.DOTALL)
+    if not match:
+        print("[OKX] 未找到 appState JSON")
+        return []
+
+    try:
+        data = json.loads(match.group(1))
+    except json.JSONDecodeError as e:
+        print(f"[OKX] JSON 解析失败: {e}")
+        return []
+
+    news_list = (
+        data.get("appContext", {})
+        .get("initialProps", {})
+        .get("orbit", {})
+        .get("feedNewsData", {})
+        .get("contentDataList", [])
+    )
+
+    items = []
+    for news in news_list:
+        title = news.get("title", "(无标题)")
+        content = news.get("content", "")
+        content_id = news.get("contentId", "")
+        author = news.get("author", {}).get("nickName", "未知")
+        source = news.get("sourcePlatform", "")
+        is_important = news.get("important", False)
+        pub_time_ms = int(news.get("publishTime", 0))
+
+        # 发布时间
+        try:
+            dt = datetime.fromtimestamp(pub_time_ms / 1000, tz=timezone.utc)
+            rfc_time = format_datetime(dt)
+        except:
+            rfc_time = NOW_RFC
+
+        # 关联代币
+        tokens = news.get("tokens", [])
+        if tokens:
+            token_parts = []
+            for t in tokens:
+                coin_name = t.get("coinName", "?")
+                last_price = t.get("last", "")
+                open24h = t.get("open24h", "")
+                try:
+                    chg = (float(last_price) - float(open24h)) / float(open24h) * 100 if open24h and open24h != "0" else 0
+                    token_parts.append(f"{coin_name} {last_price} ({chg:+.2f}%)")
+                except:
+                    token_parts.append(f"{coin_name} {last_price}")
+            token_info = " | ".join(token_parts)
+        else:
+            token_info = ""
+
+        # 摘要
+        summary = content[:300].strip()
+        if len(content) > 300:
+            summary += "..."
+
+        # 标题加标签
+        tag = "🔴" if is_important else ""
+        label = f"[OKX{'重点' if is_important else ''}]"
+        full_title = f"{label} {title}"
+        if source:
+            full_title += f" ({source})"
+
+        # 描述
+        desc_parts = []
+        if token_info:
+            desc_parts.append(f"币种: {token_info}")
+        if author:
+            desc_parts.append(f"来源: {author}")
+        if summary:
+            desc_parts.append(summary)
+        description = " | ".join(desc_parts)
+
+        link = f"https://www.okx.com/zh-hans/orbit/news/{content_id}" if content_id else "https://www.okx.com/zh-hans/orbit/news"
+
+        items.append({
+            "title": full_title,
+            "link": link,
+            "summary": description,
+            "updated": rfc_time,
+        })
+
+    print(f"[OKX] 获取到 {len(items)} 条快讯")
+    return items
 
 
 # ═══════════════════ RSS 条目构建 ═══════════════════
@@ -278,15 +372,42 @@ def build_rss_items(raw_items, source_label, source_name, default_link):
         items.append(item_xml(f"[{source_label}] {t}", u, s, pub_date=rfc))
     return items
 
+def build_chem_items(data):
+    items_xml = []
+    for it in data:
+        items_xml.append(item_xml(
+            title=f"[化工网] {it['title']}",
+            link=it["link"],
+            description=it["summary"],
+            pub_date=NOW_RFC
+        ))
+    return items_xml
+
+def build_okx_items(data):
+    """构建 OKX 快讯的 RSS item"""
+    items_xml = []
+    for it in data:
+        pub = it["updated"]
+        if isinstance(pub, datetime):
+            pub = format_datetime(pub)
+        items_xml.append(item_xml(
+            title=it["title"],
+            link=it["link"],
+            description=it["summary"],
+            pub_date=pub
+        ))
+    return items_xml
+
+
 # ═══════════════════ 主流程 ═══════════════════
 
 def main():
     parts = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<rss version="2.0"><channel>',
-        '<title>综合热榜（AI+币价+期货+新闻+宏观+ETF+巨鲸+车质网）</title>',
+        '<title>综合热榜（AI+币价+期货+新闻+宏观+ETF+巨鲸+车质网+OKX快讯）</title>',
         '<link>https://github.com/yuhao0406/aihot-rss</link>',
-        '<description>AI精选、加密行情、贵金属、少数派、Elon/Naval、化工、美联储、ETF、Whale、Nansen、车质网投诉</description>',
+        '<description>AI精选、加密行情、贵金属、少数派、Elon/Naval、化工、美联储、ETF、Whale、Nansen、车质网投诉、OKX星球快讯</description>',
         f'<lastBuildDate>{NOW_RFC}</lastBuildDate>',
     ]
 
@@ -387,14 +508,19 @@ def main():
     except Exception as e:
         errors.append(f"车质网资讯: {e}")
 
-        # 15. 化工网商品情报
+    # 15. 化工网商品情报
     try:
         chem_items = fetch_chemnet()
         parts.extend(build_chem_items(chem_items[:10]))
     except Exception as e:
         errors.append(f"化工网: {e}")
 
-
+    # 16. OKX 星球快讯  ← 新增
+    try:
+        okx_items = fetch_okx_news()
+        parts.extend(build_okx_items(okx_items))
+    except Exception as e:
+        errors.append(f"OKX快讯: {e}")
 
     parts.append("</channel></rss>")
 
