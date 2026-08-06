@@ -537,7 +537,7 @@ def main():
 
     parts.append("</channel></rss>")
 
-    os.maked      os.makedirs(os.path.dirname(OUTPUT) or ".", exist_ok=True)
+    os.makedirs(os.path.dirname(OUTPUT) or ".", exist_ok=True)
     with open(OUTPUT, "w", encoding="utf-8") as f:
         f.write("\n".join(parts))
 
