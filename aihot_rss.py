@@ -159,7 +159,7 @@ def fetch_chemnet():
     return items
 
 def fetch_okx_news():
-    """OKX 星球快讯 —— 从 SSR 内嵌 JSON (script#appState) 中提取"""
+    """OKX 星球快讯 —— 从 SSR 内嵌 JSON (script#appState) 中提取，只保留最近 1.5 小时内的"""
     url = "https://www.okx.com/zh-hans/orbit/news"
     req = Request(url, headers={"User-Agent": UA})
     for attempt in range(3):
@@ -197,10 +197,13 @@ def fetch_okx_news():
     )
 
     items = []
+    # 只保留最近 1.5 小时内的（覆盖 30 分钟抓取间隔 + 容错）
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=1.5)
+
     for news in news_list:
+        content_id = str(news.get("contentId", ""))
         title = news.get("title", "(无标题)")
         content = news.get("content", "")
-        content_id = news.get("contentId", "")
         author = news.get("author", {}).get("nickName", "未知")
         source = news.get("sourcePlatform", "")
         is_important = news.get("important", False)
@@ -209,9 +212,14 @@ def fetch_okx_news():
         # 发布时间
         try:
             dt = datetime.fromtimestamp(pub_time_ms / 1000, tz=timezone.utc)
-            rfc_time = format_datetime(dt)
         except:
-            rfc_time = NOW_RFC
+            dt = datetime.now(timezone.utc)
+
+        # 跳过旧闻
+        if dt < cutoff:
+            continue
+
+        rfc_time = format_datetime(dt)
 
         # 关联代币
         tokens = news.get("tokens", [])
@@ -230,19 +238,15 @@ def fetch_okx_news():
         else:
             token_info = ""
 
-        # 摘要
         summary = content[:300].strip()
         if len(content) > 300:
             summary += "..."
 
-        # 标题加标签
-        tag = "🔴" if is_important else ""
         label = f"[OKX{'重点' if is_important else ''}]"
         full_title = f"{label} {title}"
         if source:
             full_title += f" ({source})"
 
-        # 描述
         desc_parts = []
         if token_info:
             desc_parts.append(f"币种: {token_info}")
@@ -255,26 +259,28 @@ def fetch_okx_news():
         link = f"https://www.okx.com/zh-hans/orbit/news/{content_id}" if content_id else "https://www.okx.com/zh-hans/orbit/news"
 
         items.append({
+            "guid": content_id,    # ← 用 OKX 的 contentId 做唯一标识
             "title": full_title,
             "link": link,
             "summary": description,
             "updated": rfc_time,
         })
 
-    print(f"[OKX] 获取到 {len(items)} 条快讯")
+    print(f"[OKX] 获取到 {len(items)} 条快讯（已过滤 1.5 小时前的旧闻）")
     return items
 
 
 # ═══════════════════ RSS 条目构建 ═══════════════════
 
-def item_xml(title, link, description, pub_date=None):
+def item_xml(title, link, description, guid, pub_date=None):
+    """统一的 item 构建函数 —— 用 guid 防重复"""
     pub = pub_date or NOW_RFC
     return (f"<item>"
             f"<title>{escape(title)}</title>"
             f"<link>{escape(link)}</link>"
             f"<description>{escape(description)}</description>"
             f"<pubDate>{pub}</pubDate>"
-            f'<guid isPermaLink="false">{escape(title)}</guid>'
+            f'<guid isPermaLink="false">{escape(guid)}</guid>'
             f"</item>")
 
 def format_pct(val):
@@ -284,14 +290,16 @@ def format_pct(val):
 def build_crypto_items(data):
     items = []
     for coin in data:
+        sid = coin['id']
         desc = (f"{coin['name']}（{coin['symbol'].upper()}）: "
                 f"¥{coin['current_price']:,.2f} | "
                 f"24h: {format_pct(coin['price_change_percentage_24h'])} | "
                 f"高 ¥{coin.get('high_24h', 0):,.2f} / 低 ¥{coin.get('low_24h', 0):,.2f}")
         items.append(item_xml(
             title=f"[币] {coin['name']} ({coin['symbol'].upper()}) ¥{coin['current_price']:,.2f} {format_pct(coin['price_change_percentage_24h'])}",
-            link=f"https://www.coingecko.com/en/coins/{coin['id']}",
+            link=f"https://www.coingecko.com/en/coins/{sid}",
             description=desc,
+            guid=f"crypto-{sid}",
         ))
     return items
 
@@ -311,6 +319,7 @@ def build_metal_items(data):
             title=f"[期货] {name} ¥{price:.2f} {format_pct(pct)}",
             link=f"https://quote.eastmoney.com/qihuo/{code}.html",
             description=desc,
+            guid=f"metal-{code}",
         ))
     return items
 
@@ -326,6 +335,7 @@ def build_12365_items(data, label="车质网"):
             title=f"[{label}] {it['title']}",
             link=it.get("link", "https://www.12365auto.com/zlts/"),
             description=it.get("summary", it["title"]),
+            guid=it.get("link", it["title"]),
             pub_date=rfc
         ))
     return items_xml
@@ -342,7 +352,8 @@ def build_aihot_items(data):
             rfc = format_datetime(dt) if dt else NOW_RFC
         except:
             rfc = NOW_RFC
-        items.append(item_xml(f"[AI] {t}", u, s, pub_date=rfc))
+        # 用 URL 做 guid，确保同一篇文章不会重复
+        items.append(item_xml(f"[AI] {t}", u, s, guid=u, pub_date=rfc))
     return items
 
 def build_rss_items(raw_items, source_label, source_name, default_link):
@@ -366,10 +377,10 @@ def build_rss_items(raw_items, source_label, source_name, default_link):
                     break
                 except:
                     continue
-            rfc = format_datetime(dt) if dt else NOW_RFC
+            r = format_datetime(dt) if dt else NOW_RFC
         except:
-            rfc = NOW_RFC
-        items.append(item_xml(f"[{source_label}] {t}", u, s, pub_date=rfc))
+            r = NOW_RFC
+        items.append(item_xml(f"[{source_label}] {t}", u, s, guid=u, pub_date=rfc))
     return items
 
 def build_chem_items(data):
@@ -379,12 +390,13 @@ def build_chem_items(data):
             title=f"[化工网] {it['title']}",
             link=it["link"],
             description=it["summary"],
-            pub_date=NOW_RFC
+            guid=it["link"],
+            pub_date=NOW_RFC,
         ))
     return items_xml
 
 def build_okx_items(data):
-    """构建 OKX 快讯的 RSS item"""
+    """构建 OKX 快讯的 RSS item — 用 contentId 做 guid 去重"""
     items_xml = []
     for it in data:
         pub = it["updated"]
@@ -394,7 +406,8 @@ def build_okx_items(data):
             title=it["title"],
             link=it["link"],
             description=it["summary"],
-            pub_date=pub
+            guid=f"okx-{it.get('guid', '')}",  # ← 用 contentId
+            pub_date=pub,
         ))
     return items_xml
 
@@ -468,7 +481,7 @@ def main():
 
     # 9. Farside ETF
     try:
-        _, farside_items = fetch_rss("https://rss.941009.xyz/twitter/user/FarsideUK")
+        _, farside_items = fetch_rss("https://rss.941009.xyz/twitter/user/ariineUK")
         parts.extend(build_rss_items(farside_items[:8], "ETF资金", "Farside", "https://x.com/FarsideUK"))
     except Exception as e:
         errors.append(f"Farside ETF: {e}")
@@ -515,7 +528,7 @@ def main():
     except Exception as e:
         errors.append(f"化工网: {e}")
 
-    # 16. OKX 星球快讯  ← 新增
+    # 16. OKX 星球快讯 ← 新增
     try:
         okx_items = fetch_okx_news()
         parts.extend(build_okx_items(okx_items))
@@ -524,10 +537,11 @@ def main():
 
     parts.append("</channel></rss>")
 
-    os.makedirs(os.path.dirname(OUTPUT) or ".", exist_ok=True)
+    os.maked  os.makedirs(os.path.dirname(OUTPUT) or ".", exist_ok=True)
     with open(OUTPUT, "w", encoding="utf-8") as f:
         f.write("\n".join(parts))
 
+    print(f" 总共 {len(parts) - 6} 条 item")
     if errors:
         print("!!! 以下数据源获取失败，其余正常:")
         for e in errors:
