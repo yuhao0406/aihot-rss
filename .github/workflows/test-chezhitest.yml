@@ -6,4 +6,4 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - run: curl -s "https://china.chemnet.com/fx/intelligence.php" -H "User-Agent: Mozilla/5.0" | head -c 1000
+      - run: curl -s "https://www.okx.com/api/v1/support/news/list?type=news&limit=10" | head -c 2000
